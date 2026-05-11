@@ -6,15 +6,12 @@ document.addEventListener('DOMContentLoaded', () => {
         userTypeSelect.addEventListener('change', (e) => {
             if (e.target.value === 'Student') {
                 studentFields.style.display = 'block';
-                const inputs = studentFields.querySelectorAll('input');
-                inputs.forEach(input => input.setAttribute('required', 'required'));
+                studentFields.querySelectorAll('input').forEach(i => i.setAttribute('required', 'required'));
             } else {
                 studentFields.style.display = 'none';
-                const inputs = studentFields.querySelectorAll('input');
-                inputs.forEach(input => input.removeAttribute('required'));
+                studentFields.querySelectorAll('input').forEach(i => i.removeAttribute('required'));
             }
         });
-        
         userTypeSelect.dispatchEvent(new Event('change'));
     }
 });
