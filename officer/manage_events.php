@@ -2,25 +2,32 @@
 session_start();
 require_once '../includes/db_connect.php';
 require_once '../includes/auth_functions.php';
-
 requireRole('Officer');
 
 $userId = getCurrentUserId();
 
 function generateUuid4() {
     return sprintf('%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
-        mt_rand(0, 0xffff), mt_rand(0, 0xffff),
-        mt_rand(0, 0xffff),
-        mt_rand(0, 0x0fff) | 0x4000,
-        mt_rand(0, 0x3fff) | 0x8000,
+        mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff),
+        mt_rand(0, 0x0fff) | 0x4000, mt_rand(0, 0x3fff) | 0x8000,
         mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff)
     );
 }
 
 try {
-    $stmtOfficer = $pdo->prepare("SELECT OrgID FROM OFFICER WHERE UserID = ?");
+    $stmtOfficer = $pdo->prepare("
+        SELECT o.Position, org.OrgID, org.OrgName 
+        FROM OFFICER o
+        JOIN ORGANIZATION org ON o.OrgID = org.OrgID
+        WHERE o.UserID = ?
+    ");
     $stmtOfficer->execute([$userId]);
-    $orgId = $stmtOfficer->fetchColumn();
+    $officerData = $stmtOfficer->fetch();
+    $orgId = $officerData['OrgID'];
+
+    $stmtPendingCount = $pdo->prepare("SELECT COUNT(*) FROM MEMBERSHIP WHERE OrgID = ? AND Status = 'Pending'");
+    $stmtPendingCount->execute([$orgId]);
+    $pendingRequests = $stmtPendingCount->fetchColumn();
 
     if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
         if ($_POST['action'] === 'create') {
@@ -36,7 +43,7 @@ try {
             $eventIdToDelete = $_POST['event_id'];
             $stmtDelete = $pdo->prepare("DELETE FROM EVENT WHERE EventID = ? AND OrgID = ?");
             $stmtDelete->execute([$eventIdToDelete, $orgId]);
-            $success = "Event deleted.";
+            $success = "Event deleted successfully.";
         }
     }
 
@@ -45,7 +52,11 @@ try {
     $events = $stmtEvents->fetchAll();
 
 } catch (PDOException $e) {
-    $error = "Database error: " . $e->getMessage();
+    if ($e->getCode() == 23000) { 
+        $error = "Cannot delete this event. There are attendance records attached to it.";
+    } else {
+        $error = "Database error: " . $e->getMessage();
+    }
 }
 ?>
 
@@ -53,20 +64,27 @@ try {
 
 <div class="dashboard-layout">
     <aside class="sidebar">
+        <div class="user-info">
+            <div class="avatar"><?= strtoupper(substr($officerData['Position'], 0, 1)) ?></div>
+            <h3>Officer View</h3>
+            <p class="student-id"><?= htmlspecialchars($officerData['Position']) ?></p>
+            <p class="student-id" style="font-weight: bold; margin-top: 5px;"><?= htmlspecialchars($officerData['OrgName']) ?></p>
+        </div>
         <nav class="side-nav">
+            <p class="nav-label">Navigation</p>
             <a href="dashboard.php">Dashboard</a>
-            <a href="manage_members.php">Member Approvals</a>
+            <a href="manage_members.php">
+                Member Approvals 
+                <?php if($pendingRequests > 0): ?>
+                    <span style="background: #e74c3c; color: white; padding: 2px 6px; border-radius: 10px; font-size: 0.8rem; float: right;"><?= $pendingRequests ?></span>
+                <?php endif; ?>
+            </a>
             <a href="manage_events.php" class="active">Manage Events</a>
             <a href="attendance_scanner.php">Attendance</a>
         </nav>
-        <div class="logout-container">
-            <a href="../logout.php" class="btn-logout">Logout</a>
-        </div>
     </aside>
 
-    <section class="main-content">
-        <h3>Manage Events</h3>
-
+    <main class="main-content">
         <?php if (isset($success)): ?>
             <div style="background: #d4edda; color: #155724; padding: 1rem; border-radius: 6px; margin-bottom: 1rem;"><?= htmlspecialchars($success) ?></div>
         <?php endif; ?>
@@ -75,56 +93,54 @@ try {
             <div class="error-message"><?= htmlspecialchars($error) ?></div>
         <?php endif; ?>
 
-        <div class="guest-card" style="margin-bottom: 2rem;">
-            <h4>Create New Event</h4>
-            <form method="POST">
-                <input type="hidden" name="action" value="create">
-                <div class="form-group">
-                    <label>Event Title:</label>
-                    <input type="text" name="title" required>
-                </div>
-                <div class="form-group">
-                    <label>Date:</label>
-                    <input type="date" name="date" required>
-                </div>
-                <div class="form-group">
-                    <label>Venue:</label>
-                    <input type="text" name="venue" required>
-                </div>
-                <button type="submit" class="btn-primary">Create Event</button>
-            </form>
-        </div>
+        <div class="content-grid" style="grid-template-columns: 1fr 2fr;">
+            <div class="card">
+                <h3>Create New Event</h3>
+                <form method="POST" style="margin-top: 1rem;">
+                    <input type="hidden" name="action" value="create">
+                    <div class="form-group">
+                        <label>Event Title:</label>
+                        <input type="text" name="title" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Date:</label>
+                        <input type="date" name="date" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Venue:</label>
+                        <input type="text" name="venue" required>
+                    </div>
+                    <button type="submit" class="btn-primary">Create Event</button>
+                </form>
+            </div>
 
-        <div class="guest-card">
-            <h4>Existing Events</h4>
-            <?php if (empty($events)): ?>
-                <p>No events found.</p>
-            <?php else: ?>
-                <table style="width: 100%; border-collapse: collapse; margin-top: 1rem;">
-                    <tr style="border-bottom: 2px solid #6B1A22; text-align: left;">
-                        <th style="padding: 0.5rem;">Title</th>
-                        <th style="padding: 0.5rem;">Date</th>
-                        <th style="padding: 0.5rem;">Venue</th>
-                        <th style="padding: 0.5rem;">Action</th>
-                    </tr>
-                    <?php foreach ($events as $event): ?>
-                        <tr style="border-bottom: 1px solid #ddd;">
-                            <td style="padding: 0.5rem;"><?= htmlspecialchars($event['EventTitle']) ?></td>
-                            <td style="padding: 0.5rem;"><?= htmlspecialchars($event['Date']) ?></td>
-                            <td style="padding: 0.5rem;"><?= htmlspecialchars($event['Venue']) ?></td>
-                            <td style="padding: 0.5rem;">
-                                <form method="POST" style="display:inline;" onsubmit="return confirm('Are you sure? Cannot delete if attendance exists.');">
+            <div class="card">
+                <h3>Existing Events</h3>
+                <?php if (empty($events)): ?>
+                    <p class="empty-state">No events found. Create one to get started.</p>
+                <?php else: ?>
+                    <ul class="clean-list">
+                        <?php foreach ($events as $event): ?>
+                            <li>
+                                <div class="event-details">
+                                    <span class="dot"></span>
+                                    <div>
+                                        <span class="title" style="display:block;"><?= htmlspecialchars($event['EventTitle']) ?></span>
+                                        <span class="date"><?= date('F j, Y', strtotime($event['Date'])) ?> | <?= htmlspecialchars($event['Venue']) ?></span>
+                                    </div>
+                                </div>
+                                <form method="POST" style="margin: 0;" onsubmit="return confirm('Are you sure you want to delete this event?');">
                                     <input type="hidden" name="action" value="delete">
                                     <input type="hidden" name="event_id" value="<?= htmlspecialchars($event['EventID']) ?>">
-                                    <button type="submit" style="background: #e74c3c; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer;">Delete</button>
+                                    <button type="submit" style="background: transparent; color: #e74c3c; border: 1px solid #e74c3c; padding: 5px 10px; border-radius: 4px; cursor: pointer;">Delete</button>
                                 </form>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                </table>
-            <?php endif; ?>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                <?php endif; ?>
+            </div>
         </div>
-    </section>
+    </main>
 </div>
 
 <?php include '../includes/footer.php'; ?>

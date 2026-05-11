@@ -31,6 +31,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['org_id'])) {
 }
 
 try {
+    $stmtStudent = $pdo->prepare("SELECT * FROM STUDENT WHERE UserID = ?");
+    $stmtStudent->execute([$userId]);
+    $student = $stmtStudent->fetch();
+
     $stmt = $pdo->prepare("
         SELECT o.* FROM ORGANIZATION o
         WHERE o.OrgID NOT IN (
@@ -40,7 +44,7 @@ try {
     $stmt->execute([$userId]);
     $availableOrgs = $stmt->fetchAll();
 } catch (PDOException $e) {
-    die("Error fetching organizations: " . $e->getMessage());
+    die("Error fetching data: " . $e->getMessage());
 }
 ?>
 
@@ -48,47 +52,52 @@ try {
 
 <div class="dashboard-layout">
     <aside class="sidebar">
+        <div class="user-info">
+            <div class="avatar"><?= strtoupper(substr($student['FullName'], 0, 1)) ?></div>
+            <h3><?= htmlspecialchars($student['FullName']) ?></h3>
+            <p class="student-id"><?= htmlspecialchars($student['StudentID']) ?></p>
+        </div>
         <nav class="side-nav">
+            <p class="nav-label">Navigation</p>
             <a href="dashboard.php">Dashboard</a>
-            <a href="my_orgs.php">My Organizations</a>
+            <a href="my_orgs.php">My Organization</a>
             <a href="join_org.php" class="active">Join Organization</a>
             <a href="events.php">Events</a>
             <a href="attendance.php">Attendance</a>
             <a href="profile.php">Profile</a>
         </nav>
-        <div class="logout-container">
-            <a href="../logout.php" class="btn-logout">Logout</a>
-        </div>
     </aside>
 
-    <section class="main-content">
-        <h3>Join an Organization</h3>
-        
-        <?php if (isset($success)): ?>
-            <div style="background: #d4edda; color: #155724; padding: 1rem; border-radius: 6px; margin-bottom: 1rem;"><?= htmlspecialchars($success) ?></div>
-        <?php endif; ?>
-        
-        <?php if (isset($error)): ?>
-            <div class="error-message"><?= htmlspecialchars($error) ?></div>
-        <?php endif; ?>
-
-        <div class="guest-grid">
-            <?php if (empty($availableOrgs)): ?>
-                <p>No new organizations available to join.</p>
-            <?php else: ?>
-                <?php foreach ($availableOrgs as $org): ?>
-                    <div class="guest-card">
-                        <h4><?= htmlspecialchars($org['OrgName']) ?></h4>
-                        <p class="meta-text">Category: <?= htmlspecialchars($org['Category']) ?></p>
-                        <form method="POST" style="margin-top: 1rem;">
-                            <input type="hidden" name="org_id" value="<?= htmlspecialchars($org['OrgID']) ?>">
-                            <button type="submit" class="btn-primary" style="margin-top: 0;">Request to Join</button>
-                        </form>
-                    </div>
-                <?php endforeach; ?>
+    <main class="main-content">
+        <div class="card">
+            <h3>Join an Organization</h3>
+            
+            <?php if (isset($success)): ?>
+                <div style="background: #d4edda; color: #155724; padding: 1rem; border-radius: 6px; margin-bottom: 1rem;"><?= htmlspecialchars($success) ?></div>
             <?php endif; ?>
+            
+            <?php if (isset($error)): ?>
+                <div class="error-message"><?= htmlspecialchars($error) ?></div>
+            <?php endif; ?>
+
+            <div class="guest-grid">
+                <?php if (empty($availableOrgs)): ?>
+                    <p>No new organizations available to join.</p>
+                <?php else: ?>
+                    <?php foreach ($availableOrgs as $org): ?>
+                        <div class="guest-card">
+                            <h4><?= htmlspecialchars($org['OrgName']) ?></h4>
+                            <p class="meta-text">Category: <?= htmlspecialchars($org['Category']) ?></p>
+                            <form method="POST" style="margin-top: 1rem;">
+                                <input type="hidden" name="org_id" value="<?= htmlspecialchars($org['OrgID']) ?>">
+                                <button type="submit" class="btn-primary" style="margin-top: 0;">Request to Join</button>
+                            </form>
+                        </div>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </div>
         </div>
-    </section>
+    </main>
 </div>
 
 <?php include '../includes/footer.php'; ?>
