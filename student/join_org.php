@@ -2,49 +2,102 @@
 session_start();
 require_once '../includes/db_connect.php';
 require_once '../includes/auth_functions.php';
+
 requireRole('Student');
+
 $userId = getCurrentUserId();
 
+function generateUuid4() {
+    return sprintf('%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
+        mt_rand(0, 0xffff), mt_rand(0, 0xffff),
+        mt_rand(0, 0xffff),
+        mt_rand(0, 0x0fff) | 0x4000,
+        mt_rand(0, 0x3fff) | 0x8000,
+        mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff)
+    );
+}
+
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['org_id'])) {
+    $orgId = $_POST['org_id'];
+    $membershipId = generateUuid4();
+    
     try {
-        $stmt = $pdo->prepare("INSERT INTO MEMBERSHIP (MembershipID, StudentUserID, OrgID, Status) VALUES (UUID(), ?, ?, 'Pending')");
-        $stmt->execute([$userId, $_POST['org_id']]);
-        $success = "Request sent! Waiting for approval.";
-    } catch (PDOException $e) { $error = "You already have a request for this organization."; }
+        $stmt = $pdo->prepare("INSERT INTO MEMBERSHIP (MembershipID, StudentUserID, OrgID, Status) VALUES (?, ?, ?, 'Pending')");
+        $stmt->execute([$membershipId, $userId, $orgId]);
+        $success = "Successfully requested to join. Waiting for officer approval.";
+    } catch (PDOException $e) {
+        $error = "Error joining organization. You might already have a pending or active membership.";
+    }
 }
 
 try {
-    $student = $pdo->prepare("SELECT * FROM STUDENT WHERE UserID = ?");
-    $student->execute([$userId]);
-    $studentData = $student->fetch();
+    $stmtStudent = $pdo->prepare("SELECT * FROM STUDENT WHERE UserID = ?");
+    $stmtStudent->execute([$userId]);
+    $student = $stmtStudent->fetch();
 
-    // Show only orgs the student hasn't joined or requested yet
-    $stmt = $pdo->prepare("SELECT * FROM ORGANIZATION WHERE OrgID NOT IN (SELECT OrgID FROM MEMBERSHIP WHERE StudentUserID = ?)");
+    $stmt = $pdo->prepare("
+        SELECT o.* FROM ORGANIZATION o
+        WHERE o.OrgID NOT IN (
+            SELECT OrgID FROM MEMBERSHIP WHERE StudentUserID = ?
+        )
+    ");
     $stmt->execute([$userId]);
     $availableOrgs = $stmt->fetchAll();
-} catch (PDOException $e) { die("Error: " . $e->getMessage()); }
-
-include '../includes/header.php'; 
+} catch (PDOException $e) {
+    die("Error fetching data: " . $e->getMessage());
+}
 ?>
+
+<?php include '../includes/header.php'; ?>
+
 <div class="dashboard-layout">
     <aside class="sidebar">
-        </aside>
+        <div class="user-info">
+            <div class="avatar"><?= strtoupper(substr($student['FullName'], 0, 1)) ?></div>
+            <h3><?= htmlspecialchars($student['FullName']) ?></h3>
+            <p class="student-id"><?= htmlspecialchars($student['StudentID']) ?></p>
+        </div>
+        <nav class="side-nav">
+            <p class="nav-label">Navigation</p>
+            <a href="dashboard.php">Dashboard</a>
+            <a href="my_orgs.php">My Organization</a>
+            <a href="join_org.php" class="active">Join Organization</a>
+            <a href="events.php">Events</a>
+            <a href="attendance.php">Attendance</a>
+            <a href="profile.php">Profile</a>
+        </nav>
+    </aside>
+
     <main class="main-content">
         <div class="card">
             <h3>Join an Organization</h3>
-            <?php if (isset($success)): ?><div class="success-message" style="color:green; margin-bottom:10px;"><?= $success ?></div><?php endif; ?>
+            
+            <?php if (isset($success)): ?>
+                <div style="background: #d4edda; color: #155724; padding: 1rem; border-radius: 6px; margin-bottom: 1rem;"><?= htmlspecialchars($success) ?></div>
+            <?php endif; ?>
+            
+            <?php if (isset($error)): ?>
+                <div class="error-message"><?= htmlspecialchars($error) ?></div>
+            <?php endif; ?>
+
             <div class="guest-grid">
-                <?php foreach ($availableOrgs as $org): ?>
-                    <div class="guest-card">
-                        <h4><?= htmlspecialchars($org['OrgName']) ?></h4>
-                        <form method="POST">
-                            <input type="hidden" name="org_id" value="<?= $org['OrgID'] ?>">
-                            <button type="submit" class="btn-primary">Request to Join</button>
-                        </form>
-                    </div>
-                <?php endforeach; ?>
+                <?php if (empty($availableOrgs)): ?>
+                    <p>No new organizations available to join.</p>
+                <?php else: ?>
+                    <?php foreach ($availableOrgs as $org): ?>
+                        <div class="guest-card">
+                            <h4><?= htmlspecialchars($org['OrgName']) ?></h4>
+                            <p class="meta-text">Category: <?= htmlspecialchars($org['Category']) ?></p>
+                            <form method="POST" style="margin-top: 1rem;">
+                                <input type="hidden" name="org_id" value="<?= htmlspecialchars($org['OrgID']) ?>">
+                                <button type="submit" class="btn-primary" style="margin-top: 0;">Request to Join</button>
+                            </form>
+                        </div>
+                    <?php endforeach; ?>
+                <?php endif; ?>
             </div>
         </div>
     </main>
 </div>
+
 <?php include '../includes/footer.php'; ?>

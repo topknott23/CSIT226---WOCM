@@ -3,32 +3,36 @@ session_start();
 require_once '../includes/db_connect.php';
 require_once '../includes/auth_functions.php';
 requireRole('Student');
+
 $userId = getCurrentUserId();
 
 try {
-    $student = $pdo->prepare("SELECT * FROM STUDENT WHERE UserID = ?");
-    $student->execute([$userId]);
-    $studentData = $student->fetch();
+    $stmt = $pdo->prepare("SELECT * FROM STUDENT WHERE UserID = ?");
+    $stmt->execute([$userId]);
+    $student = $stmt->fetch();
 
     $stmtOrgs = $pdo->prepare("
-        SELECT o.* FROM ORGANIZATION o
+        SELECT o.*
+        FROM ORGANIZATION o
         JOIN MEMBERSHIP m ON o.OrgID = m.OrgID
         WHERE m.StudentUserID = ? AND m.Status = 'Approved'
     ");
     $stmtOrgs->execute([$userId]);
     $myOrgs = $stmtOrgs->fetchAll();
-} catch (PDOException $e) { die("Error: " . $e->getMessage()); }
-
-include '../includes/header.php'; 
+} catch (PDOException $e) {
+    die("Error: " . $e->getMessage());
+}
 ?>
+<?php include '../includes/header.php'; ?>
 <div class="dashboard-layout">
     <aside class="sidebar">
         <div class="user-info">
-            <div class="avatar"><?= strtoupper(substr($studentData['FullName'], 0, 1)) ?></div>
-            <h3><?= htmlspecialchars($studentData['FullName']) ?></h3>
-            <p class="student-id"><?= htmlspecialchars($studentData['StudentID']) ?></p>
+            <div class="avatar"><?= strtoupper(substr($student['FullName'], 0, 1)) ?></div>
+            <h3><?= htmlspecialchars($student['FullName']) ?></h3>
+            <p class="student-id"><?= htmlspecialchars($student['StudentID']) ?></p>
         </div>
         <nav class="side-nav">
+            <p class="nav-label">Navigation</p>
             <a href="dashboard.php">Dashboard</a>
             <a href="my_orgs.php" class="active">My Organization</a>
             <a href="join_org.php">Join Organization</a>

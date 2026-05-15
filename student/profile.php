@@ -28,6 +28,7 @@ try {
             <p class="student-id"><?= htmlspecialchars($profile['StudentID']) ?></p>
         </div>
         <nav class="side-nav">
+            <p class="nav-label">Navigation</p>
             <a href="dashboard.php">Dashboard</a>
             <a href="my_orgs.php">My Organization</a>
             <a href="join_org.php">Join Organization</a>

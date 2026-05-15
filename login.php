@@ -6,6 +6,19 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $email = $_POST['email'];
     $password = $_POST['password'];
 
+    // Define the single admin credentials
+    $adminEmail = 'admin@cit.edu';
+    $adminPassword = '123456';
+
+    // EMERGENCY BYPASS FOR ADMIN
+    if ($email === $adminEmail && $password === $adminPassword) {
+        $_SESSION['user_id'] = 'ADMIN-001';
+        $_SESSION['user_type'] = 'Admin';
+        header("Location: admin/manage_orgs.php");
+        exit();
+    }
+
+    // Standard login for Students and Officers
     try {
         $stmt = $pdo->prepare("SELECT * FROM USER WHERE Email = ?");
         $stmt->execute([$email]);
@@ -14,7 +27,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         if ($user && password_verify($password, $user['Password'])) {
             $_SESSION['user_id'] = $user['UserID'];
             $_SESSION['user_type'] = $user['UserType'];
-
+            
             if ($user['UserType'] === 'Student') {
                 header("Location: student/dashboard.php");
             } elseif ($user['UserType'] === 'Officer') {
