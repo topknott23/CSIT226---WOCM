@@ -2,7 +2,7 @@
 session_start();
 require_once '../includes/db_connect.php';
 require_once '../includes/auth_functions.php';
-requireRole('Student'); // Standardized guard check
+requireRole('Student', 'Officer');
 
 $userId = getCurrentUserId();
 

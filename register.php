@@ -1,35 +1,45 @@
 <?php
 require_once 'includes/db_connect.php';
-require_once 'includes/auth_functions.php'; // Universal UUID and session helpers
+require_once 'includes/auth_functions.php';
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $userId = generateUuid4();
-    $email = $_POST['email'];
-    $password = password_hash($_POST['password'], PASSWORD_DEFAULT);
+    $email = trim($_POST['email']);
+    $password = $_POST['password'];
     $userType = 'Student';
     
-    try {
-        $pdo->beginTransaction();
+    // PROBLEM 7 FIX: Server-side validation of institutional email parameters
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL) || !str_ends_with($email, '@cit.edu')) {
+        $error = "Registration failed: You must use a valid institutional email ending with @cit.edu.";
+    } else {
+        $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
+        
+        try {
+            $pdo->beginTransaction();
 
-        $stmt = $pdo->prepare("INSERT INTO USER (UserID, Email, Password, UserType) VALUES (?, ?, ?, ?)");
-        $stmt->execute([$userId, $email, $password, $userType]);
+            $stmt = $pdo->prepare("INSERT INTO USER (UserID, Email, Password, UserType) VALUES (?, ?, ?, ?)");
+            $stmt->execute([$userId, $email, $hashedPassword, $userType]);
 
-        if ($userType === 'Student') {
-            $studentId = $_POST['studentId'];
-            $fullName = $_POST['fullName'];
-            $course = $_POST['course'];
-            $yearLevel = $_POST['yearLevel'];
+            if ($userType === 'Student') {
+                $studentId = $_POST['studentId'];
+                $fullName = $_POST['fullName'];
+                $course = $_POST['course'];
+                $yearLevel = $_POST['yearLevel'];
 
-            $stmtStudent = $pdo->prepare("INSERT INTO STUDENT (UserID, StudentID, FullName, Course, YearLevel) VALUES (?, ?, ?, ?, ?)");
-            $stmtStudent->execute([$userId, $studentId, $fullName, $course, $yearLevel]);
+                $stmtStudent = $pdo->prepare("INSERT INTO STUDENT (UserID, StudentID, FullName, Course, YearLevel) VALUES (?, ?, ?, ?, ?)");
+                $stmtStudent->execute([$userId, $studentId, $fullName, $course, $yearLevel]);
+            }
+
+            $pdo->commit();
+            header("Location: login.php");
+            exit();
+        } catch (PDOException $e) {
+            $pdo->rollBack();
+            
+            // PROBLEM 6 FIX: Log internal error code to database log safely; show safe message to user
+            error_log("Critical Registration Transaction Failure: " . $e->getMessage());
+            $error = "Registration failed due to an unexpected system error. Please try again later.";
         }
-
-        $pdo->commit();
-        header("Location: login.php");
-        exit();
-    } catch (PDOException $e) {
-        $pdo->rollBack();
-        $error = "Registration failed: " . $e->getMessage();
     }
 }
 ?>
@@ -78,7 +88,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         </form>
 
         <div class="auth-links">
-            <p>Already have an account? <a href="login.php">Login Here</a></p>
+            <p>Already have an account? <a href="login.php">Login here</a></p>
         </div>
     </div>
 </div>

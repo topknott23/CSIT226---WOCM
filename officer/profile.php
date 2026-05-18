@@ -15,19 +15,22 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_profile'])) {
         $stmtUpdate->execute([$fullName, $course, $yearLevel, $userId]);
         $success = "Profile details updated successfully!";
     } catch (PDOException $e) {
-        $error = "Update failed: " . $e->getMessage();
+        error_log("Profile Update Error: " . $e->getMessage());
+        $error = "Update failed due to a system error.";
     }
 }
 
 try {
-    $stmtOfficer = $pdo->prepare("
+    // Unique variable name ($profileData) prevents sidebar scope collision
+    $stmtProfile = $pdo->prepare("
         SELECT s.FullName, s.StudentID, s.Course, s.YearLevel, u.Email
         FROM STUDENT s JOIN USER u ON s.UserID = u.UserID WHERE s.UserID = ?
     ");
-    $stmtOfficer->execute([$userId]);
-    $officerData = $stmtOfficer->fetch();
+    $stmtProfile->execute([$userId]);
+    $profileData = $stmtProfile->fetch();
 } catch (PDOException $e) {
-    die("Error: " . $e->getMessage());
+    error_log("Profile Fetch Error: " . $e->getMessage());
+    die("Error loading profile data.");
 }
 ?>
 
@@ -51,23 +54,23 @@ try {
                 
                 <div class="form-group" style="margin-bottom: 0;">
                     <label>Email Address (Read-only)</label>
-                    <input type="email" value="<?= htmlspecialchars($officerData['Email']) ?>" disabled style="background-color: #eee; cursor: not-allowed;">
+                    <input type="email" value="<?= htmlspecialchars($profileData['Email']) ?>" disabled style="background-color: #eee; cursor: not-allowed;">
                 </div>
                 <div class="form-group" style="margin-bottom: 0;">
                     <label>Student ID (Read-only)</label>
-                    <input type="text" value="<?= htmlspecialchars($officerData['StudentID']) ?>" disabled style="background-color: #eee; cursor: not-allowed;">
+                    <input type="text" value="<?= htmlspecialchars($profileData['StudentID']) ?>" disabled style="background-color: #eee; cursor: not-allowed;">
                 </div>
                 <div class="form-group" style="margin-bottom: 0;">
                     <label>Full Name</label>
-                    <input type="text" name="fullName" value="<?= htmlspecialchars($officerData['FullName']) ?>" required>
+                    <input type="text" name="fullName" value="<?= htmlspecialchars($profileData['FullName']) ?>" required>
                 </div>
                 <div class="form-group" style="margin-bottom: 0;">
                     <label>Course</label>
-                    <input type="text" name="course" value="<?= htmlspecialchars($officerData['Course']) ?>" required>
+                    <input type="text" name="course" value="<?= htmlspecialchars($profileData['Course']) ?>" required>
                 </div>
                 <div class="form-group" style="margin-bottom: 0;">
                     <label>Year Level</label>
-                    <input type="text" name="yearLevel" value="<?= htmlspecialchars($officerData['YearLevel']) ?>" required>
+                    <input type="text" name="yearLevel" value="<?= htmlspecialchars($profileData['YearLevel']) ?>" required>
                 </div>
 
                 <button type="submit" class="btn-primary" style="margin-top: 1rem;">Save Changes</button>
