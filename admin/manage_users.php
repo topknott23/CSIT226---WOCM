@@ -134,7 +134,15 @@ $officers = $stmtOfficers->fetchAll();
 
                     <div class="form-group" style="margin: 0;">
                         <label>Position:</label>
-                        <input type="text" name="position" placeholder="e.g., President" required>
+                        <select name="position" required>
+                            <option value="">-- Choose Position --</option>
+                            <option value="President">President</option>
+                            <option value="Vice President">Vice President</option>
+                            <option value="Secretary">Secretary</option>
+                            <option value="Treasurer">Treasurer</option>
+                            <option value="Auditor">Auditor</option>
+                            <option value="P.R.O.">P.R.O.</option>
+                        </select>
                     </div>
 
                     <button type="submit" class="btn-primary" style="grid-column: span 3;">Connect Officer to Org</button>

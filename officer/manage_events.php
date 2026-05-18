@@ -16,16 +16,14 @@ function generateUuid4() {
 
 try {
     $stmtOfficer = $pdo->prepare("
-        SELECT o.Position, org.OrgID, org.OrgName 
+        SELECT o.Position, org.OrgID, org.OrgName, s.FullName, s.StudentID
         FROM OFFICER o
         JOIN ORGANIZATION org ON o.OrgID = org.OrgID
+        JOIN STUDENT s ON o.UserID = s.UserID
         WHERE o.UserID = ?
     ");
     $stmtOfficer->execute([$userId]);
     $officerData = $stmtOfficer->fetch();
-    if(!$officerData) {
-        die("Officer data not found.");
-    }
     $orgId = $officerData['OrgID'];
 
     $stmtPendingCount = $pdo->prepare("SELECT COUNT(*) FROM MEMBERSHIP WHERE OrgID = ? AND Status = 'Pending'");
@@ -42,6 +40,15 @@ try {
             $stmtInsert = $pdo->prepare("INSERT INTO EVENT (EventID, OrgID, EventTitle, Date, Venue) VALUES (?, ?, ?, ?, ?)");
             $stmtInsert->execute([$eventId, $orgId, $title, $date, $venue]);
             $success = "Event created successfully.";
+        } elseif ($_POST['action'] === 'update') {
+            $eventId = $_POST['event_id'];
+            $title = $_POST['title'];
+            $date = $_POST['date'];
+            $venue = $_POST['venue'];
+
+            $stmtUpdate = $pdo->prepare("UPDATE EVENT SET EventTitle = ?, Date = ?, Venue = ? WHERE EventID = ? AND OrgID = ?");
+            $stmtUpdate->execute([$title, $date, $venue, $eventId, $orgId]);
+            $success = "Event details updated successfully.";
         } elseif ($_POST['action'] === 'delete') {
             $eventIdToDelete = $_POST['event_id'];
             $stmtDelete = $pdo->prepare("DELETE FROM EVENT WHERE EventID = ? AND OrgID = ?");
@@ -54,9 +61,17 @@ try {
     $stmtEvents->execute([$orgId]);
     $events = $stmtEvents->fetchAll();
 
+    // Check if editing mode is active via URL parameters
+    $editEvent = null;
+    if (isset($_GET['edit'])) {
+        $stmtEdit = $pdo->prepare("SELECT * FROM EVENT WHERE EventID = ? AND OrgID = ?");
+        $stmtEdit->execute([$_GET['edit'], $orgId]);
+        $editEvent = $stmtEdit->fetch();
+    }
+
 } catch (PDOException $e) {
     if ($e->getCode() == 23000) { 
-        $error = "Cannot delete this event. There are attendance records attached to it.";
+        $error = "Cannot process action. There are attendance records attached to this record.";
     } else {
         $error = "Database error: " . $e->getMessage();
     }
@@ -68,10 +83,11 @@ try {
 <div class="dashboard-layout">
     <aside class="sidebar">
         <div class="user-info">
-            <div class="avatar"><?= strtoupper(substr($officerData['Position'], 0, 1)) ?></div>
-            <h3>Officer View</h3>
+            <div class="avatar"><?= strtoupper(substr($officerData['FullName'], 0, 1)) ?></div>
+            <h3><?= htmlspecialchars($officerData['FullName']) ?></h3>
+            <p class="student-id"><?= htmlspecialchars($officerData['StudentID']) ?></p>
             <p class="student-id"><?= htmlspecialchars($officerData['Position']) ?></p>
-            <p class="student-id" style="font-weight: bold; margin-top: 5px;"><?= htmlspecialchars($officerData['OrgName']) ?></p>
+            <p class="student-id" style="font-weight: bold; margin-top: 5px; color: #6B1A22;"><?= htmlspecialchars($officerData['OrgName']) ?></p>
         </div>
         <nav class="side-nav">
             <p class="nav-label">Navigation</p>
@@ -83,7 +99,8 @@ try {
                 <?php endif; ?>
             </a>
             <a href="manage_events.php" class="active">Manage Events</a>
-            <a href="attendance_scanner.php">Attendance</a>
+            <a href="attendance_scanner.php">Attendance Approvals</a>
+            <a href="profile.php">Profile</a>
         </nav>
     </aside>
 
@@ -98,22 +115,29 @@ try {
 
         <div class="content-grid" style="grid-template-columns: 1fr 2fr;">
             <div class="card">
-                <h3>Create New Event</h3>
-                <form method="POST" style="margin-top: 1rem;">
-                    <input type="hidden" name="action" value="create">
+                <h3><?= $editEvent ? 'Edit Event Details' : 'Create New Event' ?></h3>
+                <form method="POST" style="margin-top: 1rem;" action="manage_events.php">
+                    <input type="hidden" name="action" value="<?= $editEvent ? 'update' : 'create' ?>">
+                    <?php if ($editEvent): ?>
+                        <input type="hidden" name="event_id" value="<?= htmlspecialchars($editEvent['EventID']) ?>">
+                    <?php endif; ?>
+
                     <div class="form-group">
                         <label>Event Title:</label>
-                        <input type="text" name="title" required>
+                        <input type="text" name="title" value="<?= htmlspecialchars($editEvent['EventTitle'] ?? '') ?>" required>
                     </div>
                     <div class="form-group">
                         <label>Date:</label>
-                        <input type="date" name="date" required>
+                        <input type="date" name="date" value="<?= htmlspecialchars($editEvent['Date'] ?? '') ?>" required>
                     </div>
                     <div class="form-group">
                         <label>Venue:</label>
-                        <input type="text" name="venue" required>
+                        <input type="text" name="venue" value="<?= htmlspecialchars($editEvent['Venue'] ?? '') ?>" required>
                     </div>
-                    <button type="submit" class="btn-primary">Create Event</button>
+                    <button type="submit" class="btn-primary"><?= $editEvent ? 'Save Changes' : 'Create Event' ?></button>
+                    <?php if ($editEvent): ?>
+                        <a href="manage_events.php" class="btn-secondary" style="display:block; text-align:center; margin-top:0.5rem; padding:0.8rem; text-decoration:none; font-size:0.9rem;">Cancel Edit</a>
+                    <?php endif; ?>
                 </form>
             </div>
 
@@ -132,11 +156,14 @@ try {
                                         <span class="date"><?= date('F j, Y', strtotime($event['Date'])) ?> | <?= htmlspecialchars($event['Venue']) ?></span>
                                     </div>
                                 </div>
-                                <form method="POST" style="margin: 0;">
-                                    <input type="hidden" name="action" value="delete">
-                                    <input type="hidden" name="event_id" value="<?= htmlspecialchars($event['EventID']) ?>">
-                                    <button type="submit" style="background: transparent; color: #e74c3c; border: 1px solid #e74c3c; padding: 5px 10px; border-radius: 4px; cursor: pointer;">Delete</button>
-                                </form>
+                                <div style="display: flex; gap: 8px; margin: 0;">
+                                    <a href="?edit=<?= htmlspecialchars($event['EventID']) ?>" style="background: transparent; color: #3498db; border: 1px solid #3498db; padding: 5px 12px; border-radius: 4px; text-decoration: none; font-size: 0.85rem;">Edit</a>
+                                    <form method="POST" style="margin: 0;">
+                                        <input type="hidden" name="action" value="delete">
+                                        <input type="hidden" name="event_id" value="<?= htmlspecialchars($event['EventID']) ?>">
+                                        <button type="submit" style="background: transparent; color: #e74c3c; border: 1px solid #e74c3c; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 0.85rem;">Delete</button>
+                                    </form>
+                                </div>
                             </li>
                         <?php endforeach; ?>
                     </ul>

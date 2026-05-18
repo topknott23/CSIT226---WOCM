@@ -18,6 +18,7 @@ $baseUrl = '/wocm';
 <?php if (isset($_SESSION['user_id'])): ?>
     <header class="app-header">
         <div class="logo-container">
+            <img src="<?= $baseUrl ?>/assets/img/citu_logo.png" alt="CIT-U Logo" class="logo" onerror="this.style.display='none'">
             <h1>WOCM</h1>
         </div>
         <div class="header-profile">
@@ -28,7 +29,7 @@ $baseUrl = '/wocm';
     <?php else: ?>
     <header class="app-header">
         <div class="logo-container">
-            <img src="<?= $baseUrl ?>/assets/img/cit-logo.png" alt="CIT-U Logo" class="logo" onerror="this.style.display='none'">
+            <img src="<?= $baseUrl ?>/assets/img/citu_logo.png" alt="CIT-U Logo" class="logo" onerror="this.style.display='none'">
             <h1>WOCM</h1>
         </div>
     </header>

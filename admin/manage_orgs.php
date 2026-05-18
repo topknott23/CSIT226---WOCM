@@ -9,24 +9,29 @@ try {
         $action = $_POST['action'];
 
         if ($action === 'create') {
-            $orgId = $_POST['org_id'];
             $name = $_POST['org_name'];
             $cat = $_POST['category'];
             $date = $_POST['date_established'];
 
-            $stmtCheck = $pdo->prepare("SELECT OrgID FROM ORGANIZATION WHERE OrgID = ?");
-            $stmtCheck->execute([$orgId]);
+            // Auto-increment OrgID manually matching your VARCHAR setup
+            $stmtCount = $pdo->query("SELECT COUNT(*) FROM ORGANIZATION");
+            $nextNum = $stmtCount->fetchColumn() + 1;
+            $orgId = 'ORG-' . str_pad($nextNum, 2, '0', STR_PAD_LEFT);
             
-            if ($stmtCheck->rowCount() > 0) {
-                $error = "That Org ID already exists. Please use a unique ID (e.g., ORG-03).";
-            } else {
-                $stmt = $pdo->prepare("INSERT INTO ORGANIZATION (OrgID, OrgName, Category, DateEstablished) VALUES (?, ?, ?, ?)");
-                $stmt->execute([$orgId, $name, $cat, $date]);
-                $success = "Organization created successfully!";
+            // Loop until absolute uniqueness to prevent gaps or duplicate overrides
+            $stmtCheck = $pdo->prepare("SELECT OrgID FROM ORGANIZATION WHERE OrgID = ?");
+            while (true) {
+                $stmtCheck->execute([$orgId]);
+                if ($stmtCheck->rowCount() == 0) break;
+                $nextNum++;
+                $orgId = 'ORG-' . str_pad($nextNum, 2, '0', STR_PAD_LEFT);
             }
+
+            $stmt = $pdo->prepare("INSERT INTO ORGANIZATION (OrgID, OrgName, Category, DateEstablished) VALUES (?, ?, ?, ?)");
+            $stmt->execute([$orgId, $name, $cat, $date]);
+            $success = "Organization created successfully with auto-generated ID: " . $orgId;
         }
 
-        // --- NEW: Update Logic ---
         if ($action === 'update') {
             $orgId = $_POST['org_id'];
             $name = $_POST['org_name'];
@@ -37,7 +42,6 @@ try {
             $stmt->execute([$name, $cat, $date, $orgId]);
             $success = "Organization updated successfully!";
         }
-        // -------------------------
 
         if ($action === 'delete') {
             $orgId = $_POST['org_id'];
@@ -69,14 +73,13 @@ try {
     $stmtOrgs = $pdo->query("SELECT * FROM ORGANIZATION ORDER BY OrgName ASC");
     $organizations = $stmtOrgs->fetchAll();
 
-    // --- NEW: Check if we are in Edit Mode ---
+    // Check if we are in Edit Mode
     $editOrg = null;
     if (isset($_GET['edit'])) {
         $stmtEdit = $pdo->prepare("SELECT * FROM ORGANIZATION WHERE OrgID = ?");
         $stmtEdit->execute([$_GET['edit']]);
         $editOrg = $stmtEdit->fetch();
     }
-    // -----------------------------------------
 
 } catch (PDOException $e) {
     $error = "System Error: " . $e->getMessage();
@@ -84,6 +87,43 @@ try {
 ?>
 
 <?php include '../includes/header.php'; ?>
+<style>
+    .modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        display: none;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+    }
+    .modal-content-card {
+        background: white;
+        padding: 2.5rem;
+        border-radius: 12px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+        border-top: 6px solid #6B1A22;
+        width: 100%;
+        max-width: 500px;
+        position: relative;
+    }
+    .close-modal {
+        position: absolute;
+        top: 15px;
+        right: 20px;
+        font-size: 1.8rem;
+        font-weight: bold;
+        color: #aaa;
+        cursor: pointer;
+    }
+    .close-modal:hover {
+        color: #6B1A22;
+    }
+</style>
+
 <div class="dashboard-layout">
     <aside class="sidebar">
         <div class="user-info">
@@ -93,54 +133,26 @@ try {
         </div>
         <nav class="side-nav">
             <p class="nav-label">Navigation</p>
-            <a href="manage_orgs.php" class="<?= basename($_SERVER['PHP_SELF']) == 'manage_orgs.php' ? 'active' : '' ?>">Manage Organizations</a>
-            <a href="manage_users.php" class="<?= basename($_SERVER['PHP_SELF']) == 'manage_users.php' ? 'active' : '' ?>">Assign Officers</a>
-            <a href="manage_students.php" class="<?= basename($_SERVER['PHP_SELF']) == 'manage_students.php' ? 'active' : '' ?>">Manage Students</a>
+            <a href="manage_orgs.php" class="active">Manage Organizations</a>
+            <a href="manage_users.php">Assign Officers</a>
+            <a href="manage_students.php">Manage Students</a>
         </nav>
     </aside>
 
     <main class="main-content">
+        <?php if (isset($success)): ?>
+            <div style="background: #d4edda; color: #155724; padding: 1rem; border-radius: 6px; margin-bottom: 1rem;"><?= htmlspecialchars($success) ?></div>
+        <?php endif; ?>
+        <?php if (isset($error)): ?>
+            <div class="error-message"><?= htmlspecialchars($error) ?></div>
+        <?php endif; ?>
+
         <div class="card">
-            <h3><?= $editOrg ? 'Edit Organization' : 'Register New Organization' ?></h3>
-            
-            <?php if (isset($success)): ?>
-                <div style="background: #d4edda; color: #155724; padding: 1rem; border-radius: 6px; margin-bottom: 1rem;"><?= htmlspecialchars($success) ?></div>
-            <?php endif; ?>
-            <?php if (isset($error)): ?>
-                <div class="error-message"><?= htmlspecialchars($error) ?></div>
-            <?php endif; ?>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; border-bottom: 2px solid #F8F5F2; padding-bottom: 0.5rem;">
+                <h3 style="margin: 0; border: none; padding: 0;">Current Organizations</h3>
+                <button onclick="openOrgModal()" class="btn-primary" style="width: auto; margin: 0; padding: 0.5rem 1.5rem; font-size: 0.9rem;">+ Create Organization</button>
+            </div>
 
-            <form method="POST" action="manage_orgs.php">
-                <input type="hidden" name="action" value="<?= $editOrg ? 'update' : 'create' ?>">
-                
-                <div class="form-group">
-                    <label>Org ID:</label>
-                    <input type="text" name="org_id" value="<?= htmlspecialchars($editOrg['OrgID'] ?? '') ?>" <?= $editOrg ? 'readonly style="background-color: #eee; cursor: not-allowed;"' : 'placeholder="e.g., ORG-01" required' ?>>
-                </div>
-                <div class="form-group">
-                    <label>Org Name:</label>
-                    <input type="text" name="org_name" value="<?= htmlspecialchars($editOrg['OrgName'] ?? '') ?>" required>
-                </div>
-                <div class="form-group">
-                    <label>Category:</label>
-                    <input type="text" name="category" value="<?= htmlspecialchars($editOrg['Category'] ?? '') ?>" required>
-                </div>
-                <div class="form-group">
-                    <label>Date Established:</label>
-                    <input type="date" name="date_established" value="<?= htmlspecialchars($editOrg['DateEstablished'] ?? '') ?>" required>
-                </div>
-                
-                <div style="display: flex; gap: 10px;">
-                    <button type="submit" class="btn-primary"><?= $editOrg ? 'Save Changes' : 'Add Organization' ?></button>
-                    <?php if ($editOrg): ?>
-                        <a href="manage_orgs.php" class="btn-secondary" style="margin-top: 1rem; text-align: center; width: 100%; box-sizing: border-box;">Cancel Edit</a>
-                    <?php endif; ?>
-                </div>
-            </form>
-        </div>
-
-        <div class="card" style="margin-top: 2rem;">
-            <h3>Current Organizations</h3>
             <?php if (empty($organizations)): ?>
                 <p class="empty-state">No organizations registered yet.</p>
             <?php else: ?>
@@ -170,4 +182,59 @@ try {
         </div>
     </main>
 </div>
+
+<div id="orgModal" class="modal" style="<?= $editOrg ? 'display: flex;' : 'display: none;' ?>">
+    <div class="modal-content-card">
+        <span class="close-modal" onclick="closeOrgModal()">&times;</span>
+        <h3 style="margin-bottom: 1.5rem; text-transform: uppercase; color: #6B1A22; font-size: 1.1rem; letter-spacing: 1px;">
+            <?= $editOrg ? 'Edit Organization' : 'Register New Organization' ?>
+        </h3>
+        
+        <form method="POST" action="manage_orgs.php">
+            <input type="hidden" name="action" value="<?= $editOrg ? 'update' : 'create' ?>">
+            
+            <?php if ($editOrg): ?>
+                <div class="form-group">
+                    <label>Org ID (Read-only):</label>
+                    <input type="text" name="org_id" value="<?= htmlspecialchars($editOrg['OrgID']) ?>" readonly style="background-color: #eee; cursor: not-allowed;">
+                </div>
+            <?php endif; ?>
+            
+            <div class="form-group">
+                <label>Org Name:</label>
+                <input type="text" name="org_name" value="<?= htmlspecialchars($editOrg['OrgName'] ?? '') ?>" required>
+            </div>
+            <div class="form-group">
+                <label>Category:</label>
+                <input type="text" name="category" value="<?= htmlspecialchars($editOrg['Category'] ?? '') ?>" required>
+            </div>
+            <div class="form-group">
+                <label>Date Established:</label>
+                <input type="date" name="date_established" value="<?= htmlspecialchars($editOrg['DateEstablished'] ?? '') ?>" required>
+            </div>
+            
+            <div style="display: flex; gap: 10px; margin-top: 1.5rem;">
+                <button type="submit" class="btn-primary" style="margin-top: 0;"><?= $editOrg ? 'Save Changes' : 'Add Organization' ?></button>
+                <?php if ($editOrg): ?>
+                    <a href="manage_orgs.php" class="btn-secondary" style="text-align: center; width: 100%; box-sizing: border-box; display: inline-block; padding: 0.9rem 0;">Cancel Edit</a>
+                <?php else: ?>
+                    <button type="button" onclick="closeOrgModal()" class="btn-secondary" style="margin-top: 0; width: 100%;">Cancel</button>
+                <?php endif; ?>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openOrgModal() {
+    document.getElementById('orgModal').style.display = 'flex';
+}
+function closeOrgModal() {
+    document.getElementById('orgModal').style.display = 'none';
+    if(window.location.search.includes('edit')) {
+        window.location.href = 'manage_orgs.php';
+    }
+}
+</script>
+
 <?php include '../includes/footer.php'; ?>

@@ -67,24 +67,28 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             <div id="student-fields">
                 <div class="form-group">
                     <label>Student ID:</label>
-                    <input type="text" name="studentId" placeholder="24-4701-389">
+                    <input type="text" name="studentId" required>
                 </div>
                 <div class="form-group">
                     <label>Full Name:</label>
-                    <input type="text" name="fullName">
+                    <input type="text" name="fullName" required>
                 </div>
                 <div class="form-group">
                     <label>Course:</label>
-                    <input type="text" name="course">
+                    <input type="text" name="course" required>
                 </div>
                 <div class="form-group">
                     <label>Year Level:</label>
-                    <input type="text" name="yearLevel">
+                    <input type="text" name="yearLevel" required>
                 </div>
             </div>
 
             <button type="submit" class="btn-primary">Register</button>
         </form>
+
+        <div class="auth-links">
+            <p>Already have an account? <a href="login.php">Login Here</a></p>
+        </div>
     </div>
 </div>
 

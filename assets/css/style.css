@@ -20,8 +20,8 @@ body {
 
 header {
     background-color: #6B1A22;
-    color: #F1C40F;
-    padding: 1rem 2rem;
+    color: #EBCF1E;
+    padding: 1.5rem 2.5rem;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -33,7 +33,7 @@ header {
 }
 
 .app-header h1 {
-    font-size: 1.5rem;
+    font-size: 2.5rem;
     letter-spacing: 2px;
 }
 
@@ -57,8 +57,8 @@ header {
 
 .btn-logout-small {
     background-color: transparent;
-    color: #F1C40F;
-    border: 1px solid #F1C40F;
+    color: #EBCF1E;
+    border: 1px solid #EBCF1E;
     padding: 0.4rem 1rem;
     border-radius: 20px;
     text-decoration: none;
@@ -67,7 +67,7 @@ header {
 }
 
 .btn-logout-small:hover {
-    background-color: #F1C40F;
+    background-color: #EBCF1E;
     color: #6B1A22;
 }
 
@@ -77,6 +77,14 @@ main {
     justify-content: center;
     align-items: center;
     padding: 2rem;
+}
+
+main, .main-content{
+    background-image: url('../img/image_backdrop.png');
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 600px;
+    background-attachment: fixed;
 }
 
 .auth-container {
@@ -229,7 +237,7 @@ main {
     border-radius: 12px;
     padding: 2rem;
     box-shadow: 0 8px 24px rgba(0,0,0,0.08);
-    border-top: 6px solid #F1C40F;
+    border-top: 6px solid #EBCF1E;
 }
 
 .guest-card h3 {
@@ -290,7 +298,7 @@ main {
 .avatar {
     width: 60px;
     height: 60px;
-    background-color: #F1C40F;
+    background-color: #EBCF1E;
     color: #6B1A22;
     border-radius: 50%;
     display: flex;
@@ -428,7 +436,7 @@ main {
 .dot {
     width: 8px;
     height: 8px;
-    background-color: #F1C40F;
+    background-color: #EBCF1E;
     border-radius: 50%;
 }
 

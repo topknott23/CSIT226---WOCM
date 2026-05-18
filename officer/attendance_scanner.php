@@ -6,19 +6,12 @@ requireRole('Officer');
 
 $userId = getCurrentUserId();
 
-function generateUuid4() {
-    return sprintf('%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
-        mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff),
-        mt_rand(0, 0x0fff) | 0x4000, mt_rand(0, 0x3fff) | 0x8000,
-        mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff)
-    );
-}
-
 try {
     $stmtOfficer = $pdo->prepare("
-        SELECT o.Position, org.OrgID, org.OrgName 
+        SELECT o.Position, org.OrgID, org.OrgName, s.FullName, s.StudentID
         FROM OFFICER o
         JOIN ORGANIZATION org ON o.OrgID = org.OrgID
+        JOIN STUDENT s ON o.UserID = s.UserID
         WHERE o.UserID = ?
     ");
     $stmtOfficer->execute([$userId]);
@@ -29,49 +22,49 @@ try {
     $stmtPendingCount->execute([$orgId]);
     $pendingRequests = $stmtPendingCount->fetchColumn();
 
-    if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['event_id']) && isset($_POST['membership_id'])) {
-        $eventId = $_POST['event_id'];
-        $membershipId = $_POST['membership_id'];
-        $attendanceId = generateUuid4();
+    // Process Attendance Approvals or Rejections
+    if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
+        $attendanceId = $_POST['attendance_id'];
         
-        $stmtCheck = $pdo->prepare("SELECT AttendanceID FROM ATTENDANCE WHERE EventID = ? AND MembershipID = ?");
-        $stmtCheck->execute([$eventId, $membershipId]);
-        
-        if ($stmtCheck->rowCount() > 0) {
-            $error = "This member has already been checked into this event.";
-        } else {
-            $stmtInsert = $pdo->prepare("INSERT INTO ATTENDANCE (AttendanceID, MembershipID, EventID, CheckInTime) VALUES (?, ?, ?, NOW())");
-            $stmtInsert->execute([$attendanceId, $membershipId, $eventId]);
-            $success = "Attendance recorded successfully.";
+        if ($_POST['action'] === 'approve_attendance') {
+            $stmtUpdate = $pdo->prepare("UPDATE ATTENDANCE SET Status = 'Approved' WHERE AttendanceID = ?");
+            $stmtUpdate->execute([$attendanceId]);
+            $success = "Attendance request verified and approved.";
+        } elseif ($_POST['action'] === 'reject_attendance') {
+            $stmtDelete = $pdo->prepare("DELETE FROM ATTENDANCE WHERE AttendanceID = ?");
+            $stmtDelete->execute([$attendanceId]);
+            $success = "Attendance request successfully rejected and cleared.";
         }
     }
 
-    $stmtEvents = $pdo->prepare("SELECT EventID, EventTitle, Date FROM EVENT WHERE OrgID = ? ORDER BY Date DESC");
-    $stmtEvents->execute([$orgId]);
-    $events = $stmtEvents->fetchAll();
-
-    $stmtMembers = $pdo->prepare("
-        SELECT m.MembershipID, s.FullName, s.StudentID 
-        FROM MEMBERSHIP m
+    // Query pending check-in requests for events belonging to this officer's organization
+    $stmtPendingAtt = $pdo->prepare("
+        SELECT a.AttendanceID, a.CheckInTime, e.EventTitle, s.FullName, s.StudentID, s.Course
+        FROM ATTENDANCE a
+        JOIN EVENT e ON a.EventID = e.EventID
+        JOIN MEMBERSHIP m ON a.MembershipID = m.MembershipID
         JOIN STUDENT s ON m.StudentUserID = s.UserID
-        WHERE m.OrgID = ? AND m.Status = 'Approved'
-        ORDER BY s.FullName ASC
+        WHERE e.OrgID = ? AND a.Status = 'Pending'
+        ORDER BY a.CheckInTime DESC
     ");
-    $stmtMembers->execute([$orgId]);
-    $members = $stmtMembers->fetchAll();
+    $stmtPendingAtt->execute([$orgId]);
+    $pendingAttendance = $stmtPendingAtt->fetchAll();
 
 } catch (PDOException $e) {
     die("Error: " . $e->getMessage());
 }
 ?>
+
 <?php include '../includes/header.php'; ?>
+
 <div class="dashboard-layout">
     <aside class="sidebar">
         <div class="user-info">
-            <div class="avatar"><?= strtoupper(substr($officerData['Position'], 0, 1)) ?></div>
-            <h3>Officer View</h3>
+            <div class="avatar"><?= strtoupper(substr($officerData['FullName'], 0, 1)) ?></div>
+            <h3><?= htmlspecialchars($officerData['FullName']) ?></h3>
+            <p class="student-id"><?= htmlspecialchars($officerData['StudentID']) ?></p>
             <p class="student-id"><?= htmlspecialchars($officerData['Position']) ?></p>
-            <p class="student-id" style="font-weight: bold; margin-top: 5px;"><?= htmlspecialchars($officerData['OrgName']) ?></p>
+            <p class="student-id" style="font-weight: bold; margin-top: 5px; color: #6B1A22;"><?= htmlspecialchars($officerData['OrgName']) ?></p>
         </div>
         <nav class="side-nav">
             <p class="nav-label">Navigation</p>
@@ -83,59 +76,52 @@ try {
                 <?php endif; ?>
             </a>
             <a href="manage_events.php">Manage Events</a>
-            <a href="attendance_scanner.php" class="active">Attendance</a>
+            <a href="attendance_scanner.php" class="active">Attendance Approvals</a>
+            <a href="profile.php">Profile</a>
         </nav>
     </aside>
+
     <main class="main-content">
-        <div class="content-grid" style="grid-template-columns: 1fr 1fr;">
-            <div class="card">
-                <h3>Manual Attendance Entry</h3>
-                <?php if (isset($success)): ?>
-                    <div style="background: #d4edda; color: #155724; padding: 1rem; border-radius: 6px; margin-bottom: 1rem;"><?= htmlspecialchars($success) ?></div>
-                <?php endif; ?>
-                <?php if (isset($error)): ?>
-                    <div class="error-message"><?= htmlspecialchars($error) ?></div>
-                <?php endif; ?>
+        <div class="card">
+            <h3>Pending Attendance Submissions</h3>
+            
+            <?php if (isset($success)): ?>
+                <div style="background: #d4edda; color: #155724; padding: 1rem; border-radius: 6px; margin-bottom: 1rem;"><?= htmlspecialchars($success) ?></div>
+            <?php endif; ?>
 
-                <?php if (empty($events) || empty($members)): ?>
-                    <p class="empty-state">You need both active events and approved members to take attendance.</p>
-                <?php else: ?>
-                    <form method="POST">
-                        <div class="form-group">
-                            <label>Select Event:</label>
-                            <select name="event_id" required>
-                                <?php foreach ($events as $event): ?>
-                                    <option value="<?= htmlspecialchars($event['EventID']) ?>">
-                                        <?= htmlspecialchars($event['EventTitle']) ?> (<?= date('M j', strtotime($event['Date'])) ?>)
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label>Select Member:</label>
-                            <select name="membership_id" required>
-                                <?php foreach ($members as $member): ?>
-                                    <option value="<?= htmlspecialchars($member['MembershipID']) ?>">
-                                        <?= htmlspecialchars($member['FullName']) ?> - <?= htmlspecialchars($member['StudentID']) ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <button type="submit" class="btn-primary">Mark as Present</button>
-                    </form>
-                <?php endif; ?>
-            </div>
-
-            <div class="card">
-                <h3>System Instructions</h3>
-                <ul style="padding-left: 20px; line-height: 1.6; color: #555;">
-                    <li>Ensure you have created the event in the <strong>Manage Events</strong> tab before taking attendance.</li>
-                    <li>Only students whose membership status is <strong>Approved</strong> will appear in the member dropdown.</li>
-                    <li>Students can view their attendance history in real-time from their personal Dashboard.</li>
-                    <li>Once an attendance record is linked to an event, that event cannot be deleted from the system (Database Persistence Rule).</li>
+            <?php if (empty($pendingAttendance)): ?>
+                <p class="empty-state">No pending attendance confirmation requests found from members.</p>
+            <?php else: ?>
+                <ul class="clean-list">
+                    <?php foreach ($pendingAttendance as $att): ?>
+                        <li>
+                            <div class="event-details">
+                                <span class="dot" style="background-color: #e67e22;"></span>
+                                <div>
+                                    <span class="title" style="display:block; font-weight:600;"><?= htmlspecialchars($att['FullName']) ?> — <span style="color:#555; font-size:0.9rem; font-weight:normal;"><?= htmlspecialchars($att['EventTitle']) ?></span></span>
+                                    <span class="date">ID: <?= htmlspecialchars($att['StudentID']) ?> | Course: <?= htmlspecialchars($att['Course']) ?></span>
+                                    <span class="date" style="display:block; font-size:0.75rem;">Submitted: <?= date('M j, Y h:i A', strtotime($att['CheckInTime'])) ?></span>
+                                </div>
+                            </div>
+                            
+                            <div style="display: flex; gap: 10px;">
+                                <form method="POST" style="margin: 0;">
+                                    <input type="hidden" name="action" value="approve_attendance">
+                                    <input type="hidden" name="attendance_id" value="<?= htmlspecialchars($att['AttendanceID']) ?>">
+                                    <button type="submit" class="btn-primary" style="padding: 0.5rem 1rem; width: auto; margin: 0; background-color: #2ecc71;">Approve</button>
+                                </form>
+                                <form method="POST" style="margin: 0;">
+                                    <input type="hidden" name="action" value="reject_attendance">
+                                    <input type="hidden" name="attendance_id" value="<?= htmlspecialchars($att['AttendanceID']) ?>">
+                                    <button type="submit" class="btn-primary" style="padding: 0.5rem 1rem; width: auto; margin: 0; background-color: #e74c3c;">Reject</button>
+                                </form>
+                            </div>
+                        </li>
+                    <?php endforeach; ?>
                 </ul>
-            </div>
+            <?php endif; ?>
         </div>
     </main>
 </div>
+
 <?php include '../includes/footer.php'; ?>

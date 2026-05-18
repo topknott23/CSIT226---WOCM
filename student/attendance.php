@@ -37,8 +37,7 @@ try {
         <nav class="side-nav">
             <p class="nav-label">Navigation</p>
             <a href="dashboard.php">Dashboard</a>
-            <a href="my_orgs.php">My Organization</a>
-            <a href="join_org.php">Join Organization</a>
+            <a href="organizations.php">Organizations</a>
             <a href="events.php">Events</a>
             <a href="attendance.php" class="active">Attendance</a>
             <a href="profile.php">Profile</a>

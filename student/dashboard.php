@@ -10,23 +10,40 @@ if (!isset($_SESSION['user_id']) || $_SESSION['user_type'] !== 'Student') {
 $userId = $_SESSION['user_id'];
 
 try {
+    // 1. Fetch Student Profile Meta
     $stmt = $pdo->prepare("SELECT * FROM STUDENT WHERE UserID = ?");
     $stmt->execute([$userId]);
     $student = $stmt->fetch();
 
+    // 2. Count Active Approved Organizations
     $stmtOrgs = $pdo->prepare("SELECT COUNT(*) as total FROM MEMBERSHIP WHERE StudentUserID = ? AND Status = 'Approved'");
     $stmtOrgs->execute([$userId]);
     $totalOrgs = $stmtOrgs->fetch()['total'];
 
+    // 3. Count Verified Attendances Only (Status = 'Approved')
     $stmtEvents = $pdo->prepare("
         SELECT COUNT(*) as total 
         FROM ATTENDANCE a
         JOIN MEMBERSHIP m ON a.MembershipID = m.MembershipID
-        WHERE m.StudentUserID = ?
+        WHERE m.StudentUserID = ? AND a.Status = 'Approved'
     ");
     $stmtEvents->execute([$userId]);
-    $totalEvents = $stmtEvents->fetch()['total'];
+    $totalEventsAttended = $stmtEvents->fetch()['total'];
 
+    // 4. Dynamically Calculate Total Possible Events across all joined Orgs
+    $stmtPossible = $pdo->prepare("
+        SELECT COUNT(*) as total 
+        FROM EVENT e
+        JOIN MEMBERSHIP m ON e.OrgID = m.OrgID
+        WHERE m.StudentUserID = ? AND m.Status = 'Approved'
+    ");
+    $stmtPossible->execute([$userId]);
+    $totalPossibleEvents = $stmtPossible->fetch()['total'];
+
+    // 5. Calculate missed events safely (prevent negative values if records mismatch)
+    $missedEvents = max(0, $totalPossibleEvents - $totalEventsAttended);
+
+    // 6. Gather Up Coming Scheduled Events List
     $stmtUpcoming = $pdo->prepare("
         SELECT e.EventTitle, e.Date, o.OrgName 
         FROM EVENT e
@@ -38,11 +55,8 @@ try {
     $stmtUpcoming->execute([$userId]);
     $upcomingEvents = $stmtUpcoming->fetchAll();
 
-    $totalPossibleEvents = 40; 
-    $attendanceRate = $totalEvents;
-
 } catch (PDOException $e) {
-    die("Error: " . $e->getMessage());
+    die("Error tracking metrics: " . $e->getMessage());
 }
 ?>
 
@@ -58,8 +72,7 @@ try {
         <nav class="side-nav">
             <p class="nav-label">Navigation</p>
             <a href="dashboard.php" class="active">Dashboard</a>
-            <a href="my_orgs.php">My Organization</a>
-            <a href="join_org.php">Join Organization</a>
+            <a href="organizations.php">Organizations</a>
             <a href="events.php">Events</a>
             <a href="attendance.php">Attendance</a>
             <a href="profile.php">Profile</a>
@@ -74,7 +87,7 @@ try {
             </div>
             <div class="stat-box">
                 <span class="stat-label">Total Events Attended:</span>
-                <span class="stat-value"><?= $totalEvents ?></span>
+                <span class="stat-value"><?= $totalEventsAttended ?></span>
             </div>
         </div>
 
@@ -82,7 +95,7 @@ try {
             <div class="card events-card">
                 <h3>Upcoming Events:</h3>
                 <?php if (empty($upcomingEvents)): ?>
-                    <p class="empty-state">No upcoming events.</p>
+                    <p class="empty-state">No upcoming events scheduled.</p>
                 <?php else: ?>
                     <ul class="clean-list">
                         <?php foreach ($upcomingEvents as $event): ?>
@@ -103,13 +116,13 @@ try {
                 <div class="chart-container">
                     <canvas id="attendanceChart"></canvas>
                     <div class="chart-center-text">
-                        <span class="big-num"><?= $attendanceRate ?>/<?= $totalPossibleEvents ?></span>
+                        <span class="big-num"><?= $totalEventsAttended ?>/<?= $totalPossibleEvents ?></span>
                         <span class="small-text">Events</span>
                     </div>
                 </div>
                 <div class="chart-legend">
-                    <div class="legend-item"><span class="box present"></span> Present: <?= $attendanceRate ?></div>
-                    <div class="legend-item"><span class="box missed"></span> Missed: <?= $totalPossibleEvents - $attendanceRate ?></div>
+                    <div class="legend-item"><span class="box present"></span> Present: <?= $totalEventsAttended ?></div>
+                    <div class="legend-item"><span class="box missed"></span> Missed: <?= $missedEvents ?></div>
                 </div>
             </div>
         </div>
@@ -119,17 +132,21 @@ try {
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const ctx = document.getElementById('attendanceChart').getContext('2d');
-    const attended = <?= $attendanceRate ?>;
-    const total = <?= $totalPossibleEvents ?>;
-    const missed = total - attended;
+    const attended = <?= $totalEventsAttended ?>;
+    const missed = <?= $missedEvents ?>;
+
+    // Handle edge case: If there are no events at all, render a neutral placeholder circle 
+    const finalAttended = (attended === 0 && missed === 0) ? 0 : attended;
+    const finalMissed = (attended === 0 && missed === 0) ? 1 : missed;
+    const chartColors = (attended === 0 && missed === 0) ? ['#bdc3c7', '#ecf0f1'] : ['#2ecc71', '#e74c3c'];
 
     new Chart(ctx, {
         type: 'doughnut',
         data: {
             labels: ['Present', 'Missed'],
             datasets: [{
-                data: [attended, missed],
-                backgroundColor: ['#2ecc71', '#ecf0f1'],
+                data: [finalAttended, finalMissed],
+                backgroundColor: chartColors,
                 borderWidth: 0,
                 cutout: '80%'
             }]
@@ -139,7 +156,7 @@ document.addEventListener('DOMContentLoaded', function() {
             maintainAspectRatio: false,
             plugins: {
                 legend: { display: false },
-                tooltip: { enabled: false }
+                tooltip: { enabled: (attended > 0 || missed > 0) }
             }
         }
     });

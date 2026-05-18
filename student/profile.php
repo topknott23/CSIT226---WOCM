@@ -47,8 +47,7 @@ try {
         <nav class="side-nav">
             <p class="nav-label">Navigation</p>
             <a href="dashboard.php">Dashboard</a>
-            <a href="my_orgs.php">My Organization</a>
-            <a href="join_org.php">Join Organization</a>
+            <a href="organizations.php">Organizations</a>
             <a href="events.php">Events</a>
             <a href="attendance.php">Attendance</a>
             <a href="profile.php" class="active">Profile</a>
@@ -56,7 +55,7 @@ try {
     </aside>
     <main class="main-content">
         <div class="card" style="max-width: 600px; margin: 0 auto;">
-            <h3 style="text-align: center; border-bottom: 2px solid #F8F5F2; padding-bottom: 1rem;">Edit Student Profile</h3>
+            <h3 style="text-align: center; border-bottom: 2px solid #F8F5F2; padding-bottom: 1rem;">Edit Profile</h3>
             
             <?php if (isset($success)): ?>
                 <div style="background: #d4edda; color: #155724; padding: 1rem; border-radius: 6px; margin-bottom: 1rem; text-align: center;">
