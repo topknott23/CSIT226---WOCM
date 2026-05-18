@@ -11,18 +11,29 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
         $position = $_POST['position'];
 
         try {
-            $pdo->beginTransaction();
+            // NEW VALIDATION LOGIC: Check if the position is already taken within this specific organization
+            $stmtCheckPos = $pdo->prepare("SELECT COUNT(*) FROM OFFICER WHERE OrgID = ? AND Position = ?");
+            $stmtCheckPos->execute([$orgId, $position]);
+            
+            if ($stmtCheckPos->fetchColumn() > 0) {
+                $error = "The position of '$position' is already taken in this organization.";
+            } else {
+                // Proceed with promotion if position is available
+                $pdo->beginTransaction();
 
-            $stmtUpdateRole = $pdo->prepare("UPDATE USER SET UserType = 'Officer' WHERE UserID = ?");
-            $stmtUpdateRole->execute([$userIdToPromote]);
+                $stmtUpdateRole = $pdo->prepare("UPDATE USER SET UserType = 'Officer' WHERE UserID = ?");
+                $stmtUpdateRole->execute([$userIdToPromote]);
 
-            $stmtInsertOfficer = $pdo->prepare("INSERT INTO OFFICER (UserID, OrgID, Position) VALUES (?, ?, ?)");
-            $stmtInsertOfficer->execute([$userIdToPromote, $orgId, $position]);
+                $stmtInsertOfficer = $pdo->prepare("INSERT INTO OFFICER (UserID, OrgID, Position) VALUES (?, ?, ?)");
+                $stmtInsertOfficer->execute([$userIdToPromote, $orgId, $position]);
 
-            $pdo->commit();
-            $success = "User successfully promoted and connected to the organization!";
+                $pdo->commit();
+                $success = "User successfully promoted and connected to the organization!";
+            }
         } catch (PDOException $e) {
-            $pdo->rollBack();
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
             if ($e->getCode() == 23000) {
                 $error = "This user is already an officer for an organization.";
             } else {
@@ -78,19 +89,7 @@ $officers = $stmtOfficers->fetchAll();
 
 <?php include '../includes/header.php'; ?>
 <div class="dashboard-layout">
-    <aside class="sidebar">
-        <div class="user-info">
-            <div class="avatar">A</div>
-            <h3>Administrator</h3>
-            <p class="student-id">System Admin</p>
-        </div>
-        <nav class="side-nav">
-            <p class="nav-label">Navigation</p>
-            <a href="manage_orgs.php" class="<?= basename($_SERVER['PHP_SELF']) == 'manage_orgs.php' ? 'active' : '' ?>">Manage Organizations</a>
-            <a href="manage_users.php" class="<?= basename($_SERVER['PHP_SELF']) == 'manage_users.php' ? 'active' : '' ?>">Assign Officers</a>
-            <a href="manage_students.php" class="<?= basename($_SERVER['PHP_SELF']) == 'manage_students.php' ? 'active' : '' ?>">Manage Students</a>
-        </nav>
-    </aside>
+    <?php include '../includes/sidebar_admin.php'; ?>
 
     <main class="main-content">
         <div class="card" style="margin-bottom: 2rem;">

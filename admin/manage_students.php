@@ -4,12 +4,9 @@ require_once '../includes/db_connect.php';
 require_once '../includes/auth_functions.php';
 requireRole('Admin');
 
-// Handle Deleting a Student or Officer
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action']) && $_POST['action'] === 'delete_student') {
     $userIdToDelete = $_POST['user_id'];
-    
     try {
-        // ON DELETE CASCADE automatically sweeps linked child items cleanly across STUDENT/OFFICER rows
         $stmtDelete = $pdo->prepare("DELETE FROM USER WHERE UserID = ? AND UserType IN ('Student', 'Officer')");
         $stmtDelete->execute([$userIdToDelete]);
         $success = "Account successfully deleted from the system.";
@@ -19,13 +16,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action']) && $_POST['a
 }
 
 try {
-    // UPDATED: Query now selects both 'Student' and 'Officer' accounts to build the full master list
     $stmtStudents = $pdo->query("
         SELECT u.UserID, u.Email, u.UserType, s.StudentID, s.FullName, s.Course, s.YearLevel 
-        FROM USER u
-        JOIN STUDENT s ON u.UserID = s.UserID
-        WHERE u.UserType IN ('Student', 'Officer')
-        ORDER BY s.FullName ASC
+        FROM USER u JOIN STUDENT s ON u.UserID = s.UserID
+        WHERE u.UserType IN ('Student', 'Officer') ORDER BY s.FullName ASC
     ");
     $students = $stmtStudents->fetchAll();
 } catch (PDOException $e) {
@@ -35,57 +29,14 @@ try {
 
 <?php include '../includes/header.php'; ?>
 <style>
-    /* Custom Modal Overlays replacing native JS prompt/alerts */
-    .modal {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background-color: rgba(0, 0, 0, 0.5);
-        display: none;
-        justify-content: center;
-        align-items: center;
-        z-index: 1000;
-    }
-    .modal-content-card {
-        background: white;
-        padding: 2.5rem;
-        border-radius: 12px;
-        box-shadow: 0 8px 24px rgba(0,0,0,0.15);
-        border-top: 6px solid #e74c3c;
-        width: 100%;
-        max-width: 500px;
-        position: relative;
-    }
-    .close-modal {
-        position: absolute;
-        top: 15px;
-        right: 20px;
-        font-size: 1.8rem;
-        font-weight: bold;
-        color: #aaa;
-        cursor: pointer;
-    }
-    .close-modal:hover {
-        color: #e74c3c;
-    }
+    .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.5); display: none; justify-content: center; align-items: center; z-index: 1000; }
+    .modal-content-card { background: white; padding: 2.5rem; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.15); border-top: 6px solid #e74c3c; width: 100%; max-width: 500px; position: relative; }
+    .close-modal { position: absolute; top: 15px; right: 20px; font-size: 1.8rem; font-weight: bold; color: #aaa; cursor: pointer; }
+    .close-modal:hover { color: #e74c3c; }
 </style>
 
 <div class="dashboard-layout">
-    <aside class="sidebar">
-        <div class="user-info">
-            <div class="avatar">A</div>
-            <h3>Administrator</h3>
-            <p class="student-id">System Admin</p>
-        </div>
-        <nav class="side-nav">
-            <p class="nav-label">Navigation</p>
-            <a href="manage_orgs.php">Manage Organizations</a>
-            <a href="manage_users.php">Assign Officers</a>
-            <a href="manage_students.php" class="active">Manage Students</a>
-        </nav>
-    </aside>
+    <?php include '../includes/sidebar_admin.php'; ?>
 
     <main class="main-content">
         <div class="card">
@@ -126,11 +77,8 @@ try {
                                     <span class="date"><strong>Email:</strong> <?= htmlspecialchars($student['Email']) ?></span>
                                 </div>
                             </div>
-                            
                             <div style="margin: 0; padding-top: 10px;">
-                                <button type="button" onclick="openDeleteModal('<?= htmlspecialchars($student['UserID']) ?>')" style="background: #e74c3c; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold;">
-                                    Delete Account
-                                </button>
+                                <button type="button" onclick="openDeleteModal('<?= htmlspecialchars($student['UserID']) ?>')" style="background: #e74c3c; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold;">Delete Account</button>
                             </div>
                         </li>
                     <?php endforeach; ?>
@@ -144,21 +92,17 @@ try {
     <div class="modal-content-card">
         <span class="close-modal" onclick="closeDeleteModal()">&times;</span>
         <h3 style="margin-bottom: 1.5rem; text-transform: uppercase; color: #6B1A22; font-size: 1.1rem; letter-spacing: 1px;">Confirm Account Deletion</h3>
-        
-        <p style="color: #555; font-size: 0.95rem; line-height: 1.6; margin-bottom: 1.5rem;">
-            Warning: This will permanently remove the account along with all associated membership approvals and historical attendance parameters.
-        </p>
+        <p style="color: #555; font-size: 0.95rem; line-height: 1.6; margin-bottom: 1.5rem;">Warning: This action will permanently delete the account, structural membership records, and historical attendance.</p>
 
         <form method="POST" action="manage_students.php" onsubmit="return validateDeleteCode(event)">
             <input type="hidden" name="action" value="delete_student">
             <input type="hidden" name="user_id" id="delete_user_id" value="">
             
             <div class="form-group">
-                <label>Please type the secret code to authorize deletion:</label>
-                <input type="text" id="secret_code_input" required placeholder="Enter code here" autocomplete="off" style="margin-bottom: 0.5rem;">
-                <div id="modal-error-message" class="error-message" style="display: none; margin-top: 0.5rem; margin-bottom: 0; padding: 0.6rem; font-size: 0.85rem;"></div>
+                <label>Type secret code to authorize deletion:</label>
+                <input type="text" id="secret_code_input" required placeholder="Enter code here" autocomplete="off">
+                <div id="modal-error-message" class="error-message" style="display: none; margin-top: 0.5rem; margin-bottom: 0; padding: 0.6rem;"></div>
             </div>
-            
             <div style="display: flex; gap: 10px; margin-top: 1.5rem;">
                 <button type="submit" class="btn-primary" style="margin-top: 0; background-color: #e74c3c;">Confirm Delete</button>
                 <button type="button" onclick="closeDeleteModal()" class="btn-secondary" style="margin-top: 0; width: 100%;">Cancel</button>
@@ -174,24 +118,14 @@ function openDeleteModal(userId) {
     document.getElementById('modal-error-message').style.display = 'none';
     document.getElementById('deleteModal').style.display = 'flex';
 }
-
-function closeDeleteModal() {
-    document.getElementById('deleteModal').style.display = 'none';
-}
-
+function closeDeleteModal() { document.getElementById('deleteModal').style.display = 'none'; }
 function validateDeleteCode(event) {
-    const inputCode = document.getElementById('secret_code_input').value;
-    const errorContainer = document.getElementById('modal-error-message');
-    
-    if (inputCode === "fasterfoster") {
-        return true; // Allow submit request to complete seamlessly
-    } else {
-        event.preventDefault(); // Stop form request propagation
-        errorContainer.textContent = "Incorrect secret code! Deletion action has been safely aborted.";
-        errorContainer.style.display = 'block';
-        return false;
-    }
+    if (document.getElementById('secret_code_input').value === "fasterfoster") return true;
+    event.preventDefault();
+    const err = document.getElementById('modal-error-message');
+    err.textContent = "Incorrect secret code! Action safely aborted.";
+    err.style.display = 'block';
+    return false;
 }
 </script>
-
 <?php include '../includes/footer.php'; ?>

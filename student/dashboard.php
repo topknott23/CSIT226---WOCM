@@ -1,52 +1,39 @@
 <?php
 session_start();
 require_once '../includes/db_connect.php';
+require_once '../includes/auth_functions.php';
+requireRole('Student'); // Standardized guard check
 
-if (!isset($_SESSION['user_id']) || $_SESSION['user_type'] !== 'Student') {
-    header("Location: ../login.php");
-    exit();
-}
-
-$userId = $_SESSION['user_id'];
+$userId = getCurrentUserId();
 
 try {
-    // 1. Fetch Student Profile Meta
-    $stmt = $pdo->prepare("SELECT * FROM STUDENT WHERE UserID = ?");
-    $stmt->execute([$userId]);
-    $student = $stmt->fetch();
-
-    // 2. Count Active Approved Organizations
+    // 1. Count Active Approved Organizations
     $stmtOrgs = $pdo->prepare("SELECT COUNT(*) as total FROM MEMBERSHIP WHERE StudentUserID = ? AND Status = 'Approved'");
     $stmtOrgs->execute([$userId]);
     $totalOrgs = $stmtOrgs->fetch()['total'];
 
-    // 3. Count Verified Attendances Only (Status = 'Approved')
+    // 2. Count Verified Attendances Only
     $stmtEvents = $pdo->prepare("
-        SELECT COUNT(*) as total 
-        FROM ATTENDANCE a
+        SELECT COUNT(*) as total FROM ATTENDANCE a
         JOIN MEMBERSHIP m ON a.MembershipID = m.MembershipID
         WHERE m.StudentUserID = ? AND a.Status = 'Approved'
     ");
     $stmtEvents->execute([$userId]);
     $totalEventsAttended = $stmtEvents->fetch()['total'];
 
-    // 4. Dynamically Calculate Total Possible Events across all joined Orgs
+    // 3. Dynamically Calculate Total Possible Events across joined Orgs
     $stmtPossible = $pdo->prepare("
-        SELECT COUNT(*) as total 
-        FROM EVENT e
+        SELECT COUNT(*) as total FROM EVENT e
         JOIN MEMBERSHIP m ON e.OrgID = m.OrgID
         WHERE m.StudentUserID = ? AND m.Status = 'Approved'
     ");
     $stmtPossible->execute([$userId]);
     $totalPossibleEvents = $stmtPossible->fetch()['total'];
-
-    // 5. Calculate missed events safely (prevent negative values if records mismatch)
     $missedEvents = max(0, $totalPossibleEvents - $totalEventsAttended);
 
-    // 6. Gather Up Coming Scheduled Events List
+    // 4. Gather Upcoming Scheduled Events List
     $stmtUpcoming = $pdo->prepare("
-        SELECT e.EventTitle, e.Date, o.OrgName 
-        FROM EVENT e
+        SELECT e.EventTitle, e.Date, o.OrgName FROM EVENT e
         JOIN ORGANIZATION o ON e.OrgID = o.OrgID
         JOIN MEMBERSHIP m ON o.OrgID = m.OrgID
         WHERE m.StudentUserID = ? AND m.Status = 'Approved' AND e.Date >= CURDATE()
@@ -63,21 +50,7 @@ try {
 <?php include '../includes/header.php'; ?>
 
 <div class="dashboard-layout">
-    <aside class="sidebar">
-        <div class="user-info">
-            <div class="avatar"><?= strtoupper(substr($student['FullName'], 0, 1)) ?></div>
-            <h3><?= htmlspecialchars($student['FullName']) ?></h3>
-            <p class="student-id"><?= htmlspecialchars($student['StudentID']) ?></p>
-        </div>
-        <nav class="side-nav">
-            <p class="nav-label">Navigation</p>
-            <a href="dashboard.php" class="active">Dashboard</a>
-            <a href="organizations.php">Organizations</a>
-            <a href="events.php">Events</a>
-            <a href="attendance.php">Attendance</a>
-            <a href="profile.php">Profile</a>
-        </nav>
-    </aside>
+    <?php include '../includes/sidebar_student.php'; ?>
 
     <div class="main-content">
         <div class="top-stats">
@@ -134,8 +107,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const ctx = document.getElementById('attendanceChart').getContext('2d');
     const attended = <?= $totalEventsAttended ?>;
     const missed = <?= $missedEvents ?>;
-
-    // Handle edge case: If there are no events at all, render a neutral placeholder circle 
     const finalAttended = (attended === 0 && missed === 0) ? 0 : attended;
     const finalMissed = (attended === 0 && missed === 0) ? 1 : missed;
     const chartColors = (attended === 0 && missed === 0) ? ['#bdc3c7', '#ecf0f1'] : ['#2ecc71', '#e74c3c'];
@@ -154,10 +125,7 @@ document.addEventListener('DOMContentLoaded', function() {
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: {
-                legend: { display: false },
-                tooltip: { enabled: (attended > 0 || missed > 0) }
-            }
+            plugins: { legend: { display: false }, tooltip: { enabled: (attended > 0 || missed > 0) } }
         }
     });
 });

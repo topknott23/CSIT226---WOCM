@@ -13,12 +13,10 @@ try {
             $cat = $_POST['category'];
             $date = $_POST['date_established'];
 
-            // Auto-increment OrgID manually matching your VARCHAR setup
             $stmtCount = $pdo->query("SELECT COUNT(*) FROM ORGANIZATION");
             $nextNum = $stmtCount->fetchColumn() + 1;
             $orgId = 'ORG-' . str_pad($nextNum, 2, '0', STR_PAD_LEFT);
             
-            // Loop until absolute uniqueness to prevent gaps or duplicate overrides
             $stmtCheck = $pdo->prepare("SELECT OrgID FROM ORGANIZATION WHERE OrgID = ?");
             while (true) {
                 $stmtCheck->execute([$orgId]);
@@ -45,22 +43,12 @@ try {
 
         if ($action === 'delete') {
             $orgId = $_POST['org_id'];
-            
             try {
                 $pdo->beginTransaction();
-                
-                // Demote all officers of this organization back to 'Student'
-                $stmtDemote = $pdo->prepare("
-                    UPDATE USER 
-                    SET UserType = 'Student' 
-                    WHERE UserID IN (SELECT UserID FROM OFFICER WHERE OrgID = ?)
-                ");
+                $stmtDemote = $pdo->prepare("UPDATE USER SET UserType = 'Student' WHERE UserID IN (SELECT UserID FROM OFFICER WHERE OrgID = ?)");
                 $stmtDemote->execute([$orgId]);
-                
-                // Delete the organization
                 $stmtDelete = $pdo->prepare("DELETE FROM ORGANIZATION WHERE OrgID = ?");
                 $stmtDelete->execute([$orgId]);
-                
                 $pdo->commit();
                 $success = "Organization forcefully deleted. Associated officers have been reverted to students.";
             } catch (PDOException $e) {
@@ -73,14 +61,12 @@ try {
     $stmtOrgs = $pdo->query("SELECT * FROM ORGANIZATION ORDER BY OrgName ASC");
     $organizations = $stmtOrgs->fetchAll();
 
-    // Check if we are in Edit Mode
     $editOrg = null;
     if (isset($_GET['edit'])) {
         $stmtEdit = $pdo->prepare("SELECT * FROM ORGANIZATION WHERE OrgID = ?");
         $stmtEdit->execute([$_GET['edit']]);
         $editOrg = $stmtEdit->fetch();
     }
-
 } catch (PDOException $e) {
     $error = "System Error: " . $e->getMessage();
 }
@@ -88,56 +74,14 @@ try {
 
 <?php include '../includes/header.php'; ?>
 <style>
-    .modal {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background-color: rgba(0, 0, 0, 0.5);
-        display: none;
-        justify-content: center;
-        align-items: center;
-        z-index: 1000;
-    }
-    .modal-content-card {
-        background: white;
-        padding: 2.5rem;
-        border-radius: 12px;
-        box-shadow: 0 8px 24px rgba(0,0,0,0.15);
-        border-top: 6px solid #6B1A22;
-        width: 100%;
-        max-width: 500px;
-        position: relative;
-    }
-    .close-modal {
-        position: absolute;
-        top: 15px;
-        right: 20px;
-        font-size: 1.8rem;
-        font-weight: bold;
-        color: #aaa;
-        cursor: pointer;
-    }
-    .close-modal:hover {
-        color: #6B1A22;
-    }
+    .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.5); display: none; justify-content: center; align-items: center; z-index: 1000; }
+    .modal-content-card { background: white; padding: 2.5rem; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.15); border-top: 6px solid #6B1A22; width: 100%; max-width: 500px; position: relative; }
+    .close-modal { position: absolute; top: 15px; right: 20px; font-size: 1.8rem; font-weight: bold; color: #aaa; cursor: pointer; }
+    .close-modal:hover { color: #6B1A22; }
 </style>
 
 <div class="dashboard-layout">
-    <aside class="sidebar">
-        <div class="user-info">
-            <div class="avatar">A</div>
-            <h3>Administrator</h3>
-            <p class="student-id">System Admin</p>
-        </div>
-        <nav class="side-nav">
-            <p class="nav-label">Navigation</p>
-            <a href="manage_orgs.php" class="active">Manage Organizations</a>
-            <a href="manage_users.php">Assign Officers</a>
-            <a href="manage_students.php">Manage Students</a>
-        </nav>
-    </aside>
+    <?php include '../includes/sidebar_admin.php'; ?>
 
     <main class="main-content">
         <?php if (isset($success)): ?>
@@ -168,7 +112,6 @@ try {
                             </div>
                             <div style="display: flex; gap: 10px;">
                                 <a href="?edit=<?= htmlspecialchars($org['OrgID']) ?>" style="background: transparent; color: #3498db; border: 1px solid #3498db; padding: 5px 15px; border-radius: 4px; text-decoration: none; font-size: 0.9rem;">Edit</a>
-                                
                                 <form method="POST" style="margin: 0;">
                                     <input type="hidden" name="action" value="delete">
                                     <input type="hidden" name="org_id" value="<?= htmlspecialchars($org['OrgID']) ?>">
@@ -192,14 +135,12 @@ try {
         
         <form method="POST" action="manage_orgs.php">
             <input type="hidden" name="action" value="<?= $editOrg ? 'update' : 'create' ?>">
-            
             <?php if ($editOrg): ?>
                 <div class="form-group">
                     <label>Org ID (Read-only):</label>
                     <input type="text" name="org_id" value="<?= htmlspecialchars($editOrg['OrgID']) ?>" readonly style="background-color: #eee; cursor: not-allowed;">
                 </div>
             <?php endif; ?>
-            
             <div class="form-group">
                 <label>Org Name:</label>
                 <input type="text" name="org_name" value="<?= htmlspecialchars($editOrg['OrgName'] ?? '') ?>" required>
@@ -226,15 +167,10 @@ try {
 </div>
 
 <script>
-function openOrgModal() {
-    document.getElementById('orgModal').style.display = 'flex';
-}
+function openOrgModal() { document.getElementById('orgModal').style.display = 'flex'; }
 function closeOrgModal() {
     document.getElementById('orgModal').style.display = 'none';
-    if(window.location.search.includes('edit')) {
-        window.location.href = 'manage_orgs.php';
-    }
+    if(window.location.search.includes('edit')) { window.location.href = 'manage_orgs.php'; }
 }
 </script>
-
 <?php include '../includes/footer.php'; ?>

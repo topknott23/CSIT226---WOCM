@@ -1,15 +1,6 @@
 <?php
 require_once 'includes/db_connect.php';
-
-function generateUuid4() {
-    return sprintf('%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
-        mt_rand(0, 0xffff), mt_rand(0, 0xffff),
-        mt_rand(0, 0xffff),
-        mt_rand(0, 0x0fff) | 0x4000,
-        mt_rand(0, 0x3fff) | 0x8000,
-        mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff)
-    );
-}
+require_once 'includes/auth_functions.php'; // Universal UUID and session helpers
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $userId = generateUuid4();
@@ -50,7 +41,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         <h2>REGISTER</h2>
         
         <?php if (isset($error)): ?>
-            <div class="error-message"><?php echo htmlspecialchars($error); ?></div>
+            <div class="error-message"><?= htmlspecialchars($error); ?></div>
         <?php endif; ?>
 
         <form method="POST" action="register.php">

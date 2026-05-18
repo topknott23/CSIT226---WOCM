@@ -7,10 +7,6 @@ requireRole('Student');
 $userId = getCurrentUserId();
 
 try {
-    $stmt = $pdo->prepare("SELECT * FROM STUDENT WHERE UserID = ?");
-    $stmt->execute([$userId]);
-    $student = $stmt->fetch();
-
     $stmtAtt = $pdo->prepare("
         SELECT a.CheckInTime, e.EventTitle, o.OrgName
         FROM ATTENDANCE a
@@ -28,21 +24,7 @@ try {
 ?>
 <?php include '../includes/header.php'; ?>
 <div class="dashboard-layout">
-    <aside class="sidebar">
-        <div class="user-info">
-            <div class="avatar"><?= strtoupper(substr($student['FullName'], 0, 1)) ?></div>
-            <h3><?= htmlspecialchars($student['FullName']) ?></h3>
-            <p class="student-id"><?= htmlspecialchars($student['StudentID']) ?></p>
-        </div>
-        <nav class="side-nav">
-            <p class="nav-label">Navigation</p>
-            <a href="dashboard.php">Dashboard</a>
-            <a href="organizations.php">Organizations</a>
-            <a href="events.php">Events</a>
-            <a href="attendance.php" class="active">Attendance</a>
-            <a href="profile.php">Profile</a>
-        </nav>
-    </aside>
+    <?php include '../includes/sidebar_student.php'; ?>
     <main class="main-content">
         <div class="card">
             <h3>Attendance History</h3>

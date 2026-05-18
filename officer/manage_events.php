@@ -6,29 +6,10 @@ requireRole('Officer');
 
 $userId = getCurrentUserId();
 
-function generateUuid4() {
-    return sprintf('%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
-        mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff),
-        mt_rand(0, 0x0fff) | 0x4000, mt_rand(0, 0x3fff) | 0x8000,
-        mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff)
-    );
-}
-
 try {
-    $stmtOfficer = $pdo->prepare("
-        SELECT o.Position, org.OrgID, org.OrgName, s.FullName, s.StudentID
-        FROM OFFICER o
-        JOIN ORGANIZATION org ON o.OrgID = org.OrgID
-        JOIN STUDENT s ON o.UserID = s.UserID
-        WHERE o.UserID = ?
-    ");
-    $stmtOfficer->execute([$userId]);
-    $officerData = $stmtOfficer->fetch();
-    $orgId = $officerData['OrgID'];
-
-    $stmtPendingCount = $pdo->prepare("SELECT COUNT(*) FROM MEMBERSHIP WHERE OrgID = ? AND Status = 'Pending'");
-    $stmtPendingCount->execute([$orgId]);
-    $pendingRequests = $stmtPendingCount->fetchColumn();
+    $stmtScope = $pdo->prepare("SELECT OrgID FROM OFFICER WHERE UserID = ?");
+    $stmtScope->execute([$userId]);
+    $orgId = $stmtScope->fetchColumn();
 
     if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
         if ($_POST['action'] === 'create') {
@@ -61,54 +42,25 @@ try {
     $stmtEvents->execute([$orgId]);
     $events = $stmtEvents->fetchAll();
 
-    // Check if editing mode is active via URL parameters
     $editEvent = null;
     if (isset($_GET['edit'])) {
         $stmtEdit = $pdo->prepare("SELECT * FROM EVENT WHERE EventID = ? AND OrgID = ?");
         $stmtEdit->execute([$_GET['edit'], $orgId]);
         $editEvent = $stmtEdit->fetch();
     }
-
 } catch (PDOException $e) {
-    if ($e->getCode() == 23000) { 
-        $error = "Cannot process action. There are attendance records attached to this record.";
-    } else {
-        $error = "Database error: " . $e->getMessage();
-    }
+    $error = ($e->getCode() == 23000) ? "Cannot process action. There are active attendance parameters attached." : "Database error: " . $e->getMessage();
 }
 ?>
 
 <?php include '../includes/header.php'; ?>
-
 <div class="dashboard-layout">
-    <aside class="sidebar">
-        <div class="user-info">
-            <div class="avatar"><?= strtoupper(substr($officerData['FullName'], 0, 1)) ?></div>
-            <h3><?= htmlspecialchars($officerData['FullName']) ?></h3>
-            <p class="student-id"><?= htmlspecialchars($officerData['StudentID']) ?></p>
-            <p class="student-id"><?= htmlspecialchars($officerData['Position']) ?></p>
-            <p class="student-id" style="font-weight: bold; margin-top: 5px; color: #6B1A22;"><?= htmlspecialchars($officerData['OrgName']) ?></p>
-        </div>
-        <nav class="side-nav">
-            <p class="nav-label">Navigation</p>
-            <a href="dashboard.php">Dashboard</a>
-            <a href="manage_members.php">
-                Member Approvals 
-                <?php if($pendingRequests > 0): ?>
-                    <span style="background: #e74c3c; color: white; padding: 2px 6px; border-radius: 10px; font-size: 0.8rem; float: right;"><?= $pendingRequests ?></span>
-                <?php endif; ?>
-            </a>
-            <a href="manage_events.php" class="active">Manage Events</a>
-            <a href="attendance_scanner.php">Attendance Approvals</a>
-            <a href="profile.php">Profile</a>
-        </nav>
-    </aside>
+    <?php include '../includes/sidebar_officer.php'; ?>
 
     <main class="main-content">
         <?php if (isset($success)): ?>
             <div style="background: #d4edda; color: #155724; padding: 1rem; border-radius: 6px; margin-bottom: 1rem;"><?= htmlspecialchars($success) ?></div>
         <?php endif; ?>
-        
         <?php if (isset($error)): ?>
             <div class="error-message"><?= htmlspecialchars($error) ?></div>
         <?php endif; ?>
@@ -116,7 +68,7 @@ try {
         <div class="content-grid" style="grid-template-columns: 1fr 2fr;">
             <div class="card">
                 <h3><?= $editEvent ? 'Edit Event Details' : 'Create New Event' ?></h3>
-                <form method="POST" style="margin-top: 1rem;" action="manage_events.php">
+                <form method="POST" action="manage_events.php">
                     <input type="hidden" name="action" value="<?= $editEvent ? 'update' : 'create' ?>">
                     <?php if ($editEvent): ?>
                         <input type="hidden" name="event_id" value="<?= htmlspecialchars($editEvent['EventID']) ?>">
@@ -172,5 +124,4 @@ try {
         </div>
     </main>
 </div>
-
 <?php include '../includes/footer.php'; ?>
