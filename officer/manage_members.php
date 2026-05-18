@@ -19,9 +19,21 @@ try {
             $stmtUpdate->execute([$membershipId, $orgId]);
             $success = "Member approved successfully.";
         } elseif ($_POST['action'] === 'reject' || $_POST['action'] === 'remove') {
-            $stmtDelete = $pdo->prepare("DELETE FROM MEMBERSHIP WHERE MembershipID = ? AND OrgID = ?");
-            $stmtDelete->execute([$membershipId, $orgId]);
-            $success = "Member request processed successfully.";
+            try {
+                $stmtCheckSelf = $pdo->prepare("SELECT StudentUserID FROM MEMBERSHIP WHERE MembershipID = ?");
+                $stmtCheckSelf->execute([$membershipId]);
+                $targetTargetUser = $stmtCheckSelf->fetchColumn();
+
+                if ($targetTargetUser === $userId) {
+                    $error = "Action denied: You cannot remove yourself from the organization membership list while serving as an active officer. An Administrator must reassign your role first.";
+                } else {
+                    $stmtDelete = $pdo->prepare("DELETE FROM MEMBERSHIP WHERE MembershipID = ? AND OrgID = ?");
+                    $stmtDelete->execute([$membershipId, $orgId]);
+                    $success = "Member request processed successfully.";
+                }
+            } catch (PDOException $e) {
+                $error = "Database error: " . $e->getMessage();
+            }
         }
     }
 
@@ -53,6 +65,9 @@ try {
         <?php if (isset($success)): ?>
             <div style="background: #d4edda; color: #155724; padding: 1rem; border-radius: 6px; margin-bottom: 1rem;"><?= htmlspecialchars($success) ?></div>
         <?php endif; ?>
+        <?php if (isset($error)): ?>
+            <div class="error-message"><?= htmlspecialchars($error) ?></div>
+        <?php endif; ?>
 
         <div class="card" style="margin-bottom: 2rem;">
             <h3>Pending Member Approvals</h3>
@@ -72,12 +87,12 @@ try {
                             <div style="display: flex; gap: 10px;">
                                 <form method="POST" style="margin: 0;">
                                     <input type="hidden" name="action" value="approve">
-                                    <input type="hidden" name="membership_id" value="<?= $member['MembershipID'] ?>">
+                                    <input type="hidden" name="membership_id" value="<?= htmlspecialchars($member['MembershipID']) ?>">
                                     <button type="submit" class="btn-primary" style="padding: 0.5rem 1rem; width: auto; margin: 0; background-color: #2ecc71;">Approve</button>
                                 </form>
                                 <form method="POST" style="margin: 0;">
                                     <input type="hidden" name="action" value="reject">
-                                    <input type="hidden" name="membership_id" value="<?= $member['MembershipID'] ?>">
+                                    <input type="hidden" name="membership_id" value="<?= htmlspecialchars($member['MembershipID']) ?>">
                                     <button type="submit" class="btn-primary" style="padding: 0.5rem 1rem; width: auto; margin: 0; background-color: #e74c3c;">Reject</button>
                                 </form>
                             </div>
@@ -104,7 +119,7 @@ try {
                             </div>
                             <form method="POST" style="margin: 0;">
                                 <input type="hidden" name="action" value="remove">
-                                <input type="hidden" name="membership_id" value="<?= $member['MembershipID'] ?>">
+                                <input type="hidden" name="membership_id" value="<?= htmlspecialchars($member['MembershipID']) ?>">
                                 <button type="submit" style="background: transparent; color: #e74c3c; border: 1px solid #e74c3c; padding: 5px 10px; border-radius: 4px; cursor: pointer;">Remove</button>
                             </form>
                         </li>

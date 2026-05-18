@@ -10,27 +10,64 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
     if ($_POST['action'] === 'leave') {
         $orgIdToLeave = $_POST['org_id'];
         try {
-            $stmtLeave = $pdo->prepare("DELETE FROM MEMBERSHIP WHERE StudentUserID = ? AND OrgID = ?");
-            $stmtLeave->execute([$userId, $orgIdToLeave]);
-            $success = "You have successfully left the organization.";
+            $stmtCheckOfficerStatus = $pdo->prepare("SELECT Position FROM OFFICER WHERE UserID = ? AND OrgID = ?");
+            $stmtCheckOfficerStatus->execute([$userId, $orgIdToLeave]);
+            $officerPosition = $stmtCheckOfficerStatus->fetchColumn();
+
+            if ($officerPosition) {
+                $error = "Leave request denied: You are registered as the '$officerPosition' of this organization. An Administrator must step down your role before you can leave.";
+            } else {
+                $pdo->beginTransaction();
+
+                $stmtLeave = $pdo->prepare("DELETE FROM MEMBERSHIP WHERE StudentUserID = ? AND OrgID = ?");
+                $stmtLeave->execute([$userId, $orgIdToLeave]);
+
+                $stmtRemoveOfficer = $pdo->prepare("DELETE FROM OFFICER WHERE UserID = ? AND OrgID = ?");
+                $stmtRemoveOfficer->execute([$userId, $orgIdToLeave]);
+
+                $stmtCheckOfficer = $pdo->prepare("SELECT COUNT(*) FROM OFFICER WHERE UserID = ?");
+                $stmtCheckOfficer->execute([$userId]);
+                
+                if ($stmtCheckOfficer->fetchColumn() == 0) {
+                    $stmtDemote = $pdo->prepare("UPDATE USER SET UserType = 'Student' WHERE UserID = ? AND UserType = 'Officer'");
+                    $stmtDemote->execute([$userId]);
+                    
+                    if (isset($_SESSION['user_type']) && $_SESSION['user_type'] === 'Officer') {
+                        $_SESSION['user_type'] = 'Student';
+                    }
+                }
+
+                $pdo->commit();
+                $success = "You have successfully left the organization.";
+            }
         } catch (PDOException $e) {
-            $error = "Error leaving organization: " . $e->getMessage();
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            $error = "Error processing request: " . $e->getMessage();
         }
     } elseif ($_POST['action'] === 'join' && isset($_POST['org_id'])) {
         $orgId = $_POST['org_id'];
         $membershipId = generateUuid4();
+        
         try {
-            $stmtJoin = $pdo->prepare("INSERT INTO MEMBERSHIP (MembershipID, StudentUserID, OrgID, Status) VALUES (?, ?, ?, 'Pending')");
-            $stmtJoin->execute([$membershipId, $userId, $orgId]);
-            $success = "Successfully requested to join. Waiting for officer approval.";
+            $stmtCheck = $pdo->prepare("SELECT MembershipID FROM MEMBERSHIP WHERE StudentUserID = ? AND OrgID = ?");
+            $stmtCheck->execute([$userId, $orgId]);
+            
+            if ($stmtCheck->rowCount() > 0) {
+                $error = "You already have an active or pending request for this organization.";
+            } else {
+                $stmtJoin = $pdo->prepare("INSERT INTO MEMBERSHIP (MembershipID, StudentUserID, OrgID, Status) VALUES (?, ?, ?, 'Pending')");
+                $stmtJoin->execute([$membershipId, $userId, $orgId]);
+                $success = "Successfully requested to join. Waiting for officer approval.";
+            }
         } catch (PDOException $e) {
-            $error = "Error joining organization. You might already have a pending or active membership.";
+            $error = "System error processing your request.";
         }
     }
 }
 
 try {
-    // 1. Approved Organizations
     $stmtMyOrgs = $pdo->prepare("
         SELECT o.* FROM ORGANIZATION o
         JOIN MEMBERSHIP m ON o.OrgID = m.OrgID
@@ -40,7 +77,6 @@ try {
     $stmtMyOrgs->execute([$userId]);
     $myOrgs = $stmtMyOrgs->fetchAll();
 
-    // 2. Pending Approvals 
     $stmtPendingOrgs = $pdo->prepare("
         SELECT o.* FROM ORGANIZATION o
         JOIN MEMBERSHIP m ON o.OrgID = m.OrgID
@@ -50,7 +86,6 @@ try {
     $stmtPendingOrgs->execute([$userId]);
     $pendingOrgs = $stmtPendingOrgs->fetchAll();
 
-    // 3. Available Organizations to Discover
     $stmtAvailableOrgs = $pdo->prepare("
         SELECT o.* FROM ORGANIZATION o
         WHERE o.OrgID NOT IN (SELECT OrgID FROM MEMBERSHIP WHERE StudentUserID = ?)
@@ -137,4 +172,4 @@ try {
         </div>
     </main>
 </div>
-<?php include '../includes/footer.php'; ?>
+<?php include '../includes/footer.php'; ?>  

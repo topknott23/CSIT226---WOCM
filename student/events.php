@@ -58,8 +58,46 @@ try {
 
         <div class="card">
             <h3>All Organization Events</h3>
-            ...
+            <div class="card">
+            <h3>All Organization Events</h3>
+            
+            <?php if (empty($events)): ?>
+                <p class="empty-state">There are no upcoming events for your organizations.</p>
+            <?php else: ?>
+                <ul class="clean-list">
+                    <?php foreach ($events as $event): ?>
+                        <li>
+                            <div class="event-details">
+                                <span class="dot" style="background-color: #3498db;"></span>
+                                <div>
+                                    <span class="title" style="display:block;"><?= htmlspecialchars($event['EventTitle']) ?></span>
+                                    <span class="date">
+                                        <?= htmlspecialchars($event['OrgName']) ?> | 
+                                        <?= date('F j, Y', strtotime($event['Date'])) ?> @ <?= htmlspecialchars($event['Venue']) ?>
+                                    </span>
+                                </div>
+                            </div>
+                            
+                            <div style="margin: 0;">
+                                <?php if ($event['AttendanceStatus'] === 'Approved'): ?>
+                                    <span style="background: #d4edda; color: #155724; padding: 5px 12px; border-radius: 4px; font-size: 0.85rem; font-weight: bold;">Verified</span>
+                                <?php elseif ($event['AttendanceStatus'] === 'Pending'): ?>
+                                    <span style="background: #fff3cd; color: #856404; padding: 5px 12px; border-radius: 4px; font-size: 0.85rem; font-weight: bold;">Pending Approval</span>
+                                <?php else: ?>
+                                    <form method="POST" style="margin: 0;">
+                                        <input type="hidden" name="action" value="request_attendance">
+                                        <input type="hidden" name="event_id" value="<?= htmlspecialchars($event['EventID']) ?>">
+                                        <input type="hidden" name="membership_id" value="<?= htmlspecialchars($event['MembershipID']) ?>">
+                                        <button type="submit" class="btn-primary" style="margin: 0; padding: 6px 15px; width: auto; font-size: 0.85rem;">Check In</button>
+                                    </form>
+                                <?php endif; ?>
+                            </div>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
+            <?php endif; ?>
         </div>
     </main>
 </div>
 <?php include '../includes/footer.php'; ?>
+        

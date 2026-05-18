@@ -27,8 +27,22 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
                 $stmtInsertOfficer = $pdo->prepare("INSERT INTO OFFICER (UserID, OrgID, Position) VALUES (?, ?, ?)");
                 $stmtInsertOfficer->execute([$userIdToPromote, $orgId, $position]);
 
+                // --- THE FIX: Automatically give them an Approved Membership ---
+                $newMemId = generateUuid4();
+                $stmtCheckMem = $pdo->prepare("SELECT MembershipID FROM MEMBERSHIP WHERE StudentUserID = ? AND OrgID = ?");
+                $stmtCheckMem->execute([$userIdToPromote, $orgId]);
+                
+                if ($stmtCheckMem->rowCount() == 0) {
+                    $stmtInsertMem = $pdo->prepare("INSERT INTO MEMBERSHIP (MembershipID, StudentUserID, OrgID, Status) VALUES (?, ?, ?, 'Approved')");
+                    $stmtInsertMem->execute([$newMemId, $userIdToPromote, $orgId]);
+                } else {
+                    $stmtUpdateMem = $pdo->prepare("UPDATE MEMBERSHIP SET Status = 'Approved' WHERE StudentUserID = ? AND OrgID = ?");
+                    $stmtUpdateMem->execute([$userIdToPromote, $orgId]);
+                }
+                // ---------------------------------------------------------------
+
                 $pdo->commit();
-                $success = "User successfully promoted and connected to the organization!";
+                $success = "User successfully promoted and automatically enrolled as a member!";
             }
         } catch (PDOException $e) {
             if ($pdo->inTransaction()) {

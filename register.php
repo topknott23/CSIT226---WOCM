@@ -1,4 +1,14 @@
 <?php
+if (session_status() === PHP_SESSION_NONE) { session_start(); }
+if (isset($_SESSION['user_id'])) {
+    if ($_SESSION['user_type'] === 'Student') header("Location: student/dashboard.php");
+    elseif ($_SESSION['user_type'] === 'Officer') header("Location: officer/dashboard.php");
+    elseif ($_SESSION['user_type'] === 'Admin') header("Location: admin/manage_orgs.php");
+    exit();
+}
+
+require_once 'includes/db_connect.php';
+
 require_once 'includes/db_connect.php';
 require_once 'includes/auth_functions.php';
 
