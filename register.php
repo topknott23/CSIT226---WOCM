@@ -15,8 +15,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $userId = generateUuid4();
     $email = $_POST['email'];
     $password = password_hash($_POST['password'], PASSWORD_DEFAULT);
-    $userType = $_POST['userType'];
-
+    $userType = 'Student';
+    
     try {
         $pdo->beginTransaction();
 
@@ -62,14 +62,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             <div class="form-group">
                 <label>Password:</label>
                 <input type="password" name="password" required>
-            </div>
-
-            <div class="form-group">
-                <label>Register As:</label>
-                <select name="userType" id="userType" required>
-                    <option value="Student">Student</option>
-                    <option value="Officer">Officer</option>
-                </select>
             </div>
 
             <div id="student-fields">

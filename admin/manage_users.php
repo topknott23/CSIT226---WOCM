@@ -86,9 +86,9 @@ $officers = $stmtOfficers->fetchAll();
         </div>
         <nav class="side-nav">
             <p class="nav-label">Navigation</p>
-            <a href="manage_orgs.php">Manage Organizations</a>
-            <a href="manage_users.php" class="active">Assign Officers</a>
-            <a href="../logout.php">Logout</a>
+            <a href="manage_orgs.php" class="<?= basename($_SERVER['PHP_SELF']) == 'manage_orgs.php' ? 'active' : '' ?>">Manage Organizations</a>
+            <a href="manage_users.php" class="<?= basename($_SERVER['PHP_SELF']) == 'manage_users.php' ? 'active' : '' ?>">Assign Officers</a>
+            <a href="manage_students.php" class="<?= basename($_SERVER['PHP_SELF']) == 'manage_students.php' ? 'active' : '' ?>">Manage Students</a>
         </nav>
     </aside>
 
@@ -157,7 +157,7 @@ $officers = $stmtOfficers->fetchAll();
                                     <span class="date"><?= htmlspecialchars($off['OrgName']) ?> | <?= htmlspecialchars($off['Email']) ?></span>
                                 </div>
                             </div>
-                            <form method="POST" style="margin: 0;" onsubmit="return confirm('Remove this officer? They will become a standard student again.');">
+                            <form method="POST" style="margin: 0;">
                                 <input type="hidden" name="action" value="remove_officer">
                                 <input type="hidden" name="user_id" value="<?= htmlspecialchars($off['UserID']) ?>">
                                 <input type="hidden" name="org_id" value="<?= htmlspecialchars($off['OrgID']) ?>">

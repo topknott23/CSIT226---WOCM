@@ -23,6 +23,9 @@ try {
     ");
     $stmtOfficer->execute([$userId]);
     $officerData = $stmtOfficer->fetch();
+    if(!$officerData) {
+        die("Officer data not found.");
+    }
     $orgId = $officerData['OrgID'];
 
     $stmtPendingCount = $pdo->prepare("SELECT COUNT(*) FROM MEMBERSHIP WHERE OrgID = ? AND Status = 'Pending'");
@@ -129,7 +132,7 @@ try {
                                         <span class="date"><?= date('F j, Y', strtotime($event['Date'])) ?> | <?= htmlspecialchars($event['Venue']) ?></span>
                                     </div>
                                 </div>
-                                <form method="POST" style="margin: 0;" onsubmit="return confirm('Are you sure you want to delete this event?');">
+                                <form method="POST" style="margin: 0;">
                                     <input type="hidden" name="action" value="delete">
                                     <input type="hidden" name="event_id" value="<?= htmlspecialchars($event['EventID']) ?>">
                                     <button type="submit" style="background: transparent; color: #e74c3c; border: 1px solid #e74c3c; padding: 5px 10px; border-radius: 4px; cursor: pointer;">Delete</button>

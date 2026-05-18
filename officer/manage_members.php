@@ -17,15 +17,9 @@ try {
     $officerData = $stmtOfficer->fetch();
 
     if (!$officerData) {
-        $officerData = [
-            'Position' => 'Unassigned',
-            'OrgID' => null,
-            'OrgName' => 'No Organization Linked'
-        ];
-        $orgId = null;
-    } else {
-        $orgId = $officerData['OrgID'];
+        die("Access Denied: You must be assigned to an organization by an Admin before accessing this page.");
     }
+    $orgId = $officerData['OrgID'];
 
     $pendingMembers = [];
     $approvedMembers = [];

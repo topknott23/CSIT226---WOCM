@@ -7,7 +7,7 @@ requireRole('Officer');
 $userId = getCurrentUserId();
 
 try {
-    // 1. Fetch Officer Data safely
+    
     $stmtOfficer = $pdo->prepare("
         SELECT o.Position, org.OrgID, org.OrgName 
         FROM OFFICER o
@@ -17,7 +17,7 @@ try {
     $stmtOfficer->execute([$userId]);
     $officerData = $stmtOfficer->fetch();
 
-    // THE FIX: Provide a fallback if the officer hasn't been assigned an org yet
+
     if (!$officerData) {
         $officerData = [
             'Position' => 'Unassigned',
@@ -29,12 +29,12 @@ try {
         $orgId = $officerData['OrgID'];
     }
 
-    // Initialize default values to prevent undefined variable errors
+ 
     $activeMembers = 0;
     $pendingRequests = 0;
     $orgEvents = [];
 
-    // Only run these queries if an OrgID actually exists
+
     if ($orgId) {
         $stmtMembers = $pdo->prepare("
             SELECT 

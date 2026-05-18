@@ -6,6 +6,20 @@ requireRole('Student');
 
 $userId = getCurrentUserId();
 
+// --- NEW: Handle Leaving an Organization ---
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action']) && $_POST['action'] === 'leave') {
+    $orgIdToLeave = $_POST['org_id'];
+    
+    try {
+        $stmtLeave = $pdo->prepare("DELETE FROM MEMBERSHIP WHERE StudentUserID = ? AND OrgID = ?");
+        $stmtLeave->execute([$userId, $orgIdToLeave]);
+        $success = "You have successfully left the organization.";
+    } catch (PDOException $e) {
+        $error = "Error leaving organization: " . $e->getMessage();
+    }
+}
+// -----------------------------------------
+
 try {
     $stmt = $pdo->prepare("SELECT * FROM STUDENT WHERE UserID = ?");
     $stmt->execute([$userId]);
@@ -44,6 +58,15 @@ try {
     <main class="main-content">
         <div class="card">
             <h3>My Organizations</h3>
+            
+            <?php if (isset($success)): ?>
+                <div style="background: #d4edda; color: #155724; padding: 1rem; border-radius: 6px; margin-bottom: 1rem;"><?= htmlspecialchars($success) ?></div>
+            <?php endif; ?>
+            
+            <?php if (isset($error)): ?>
+                <div class="error-message"><?= htmlspecialchars($error) ?></div>
+            <?php endif; ?>
+
             <?php if (empty($myOrgs)): ?>
                 <p class="empty-state">You are not a member of any organizations yet.</p>
             <?php else: ?>
@@ -52,6 +75,14 @@ try {
                         <div class="guest-card" style="border-top-color: #6B1A22;">
                             <h4><?= htmlspecialchars($org['OrgName']) ?></h4>
                             <p class="meta-text">Category: <?= htmlspecialchars($org['Category']) ?></p>
+                            
+                            <form method="POST" style="margin-top: 1.5rem;">
+                                <input type="hidden" name="action" value="leave">
+                                <input type="hidden" name="org_id" value="<?= htmlspecialchars($org['OrgID']) ?>">
+                                <button type="submit" style="width: 100%; padding: 0.8rem; background-color: white; color: #e74c3c; border: 1px solid #e74c3c; border-radius: 6px; font-weight: bold; cursor: pointer; transition: all 0.2s;">
+                                    Leave Organization
+                                </button>
+                            </form>
                         </div>
                     <?php endforeach; ?>
                 </div>
