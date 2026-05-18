@@ -54,9 +54,10 @@ try {
     $stmtAvailableOrgs = $pdo->prepare("
         SELECT o.* FROM ORGANIZATION o
         WHERE o.OrgID NOT IN (SELECT OrgID FROM MEMBERSHIP WHERE StudentUserID = ?)
+          AND o.OrgID NOT IN (SELECT OrgID FROM OFFICER WHERE UserID = ?)
         ORDER BY o.OrgName ASC
     ");
-    $stmtAvailableOrgs->execute([$userId]);
+    $stmtAvailableOrgs->execute([$userId, $userId]);
     $availableOrgs = $stmtAvailableOrgs->fetchAll();
 } catch (PDOException $e) {
     die("Error fetching data: " . $e->getMessage());

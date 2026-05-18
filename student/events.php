@@ -58,7 +58,42 @@ try {
 
         <div class="card">
             <h3>All Organization Events</h3>
-            ...
+            <?php if (empty($events)): ?>
+                <p class="empty-state">No events scheduled for your active organizations yet.</p>
+            <?php else: ?>
+                <ul class="clean-list">
+                    <?php foreach ($events as $event): ?>
+                        <li>
+                            <div class="event-details">
+                                <span class="dot" style="background-color: <?= $event['AttendanceStatus'] === 'Approved' ? '#2ecc71' : ($event['AttendanceStatus'] === 'Pending' ? '#F1C40F' : '#EBCF1E') ?>;"></span>
+                                <div>
+                                    <span class="title" style="display:block; font-weight: 600;"><?= htmlspecialchars($event['EventTitle']) ?></span>
+                                    <span class="date" style="display:block; color:#666; font-size:0.85rem; margin-top: 2px;">
+                                        <strong>Org:</strong> <?= htmlspecialchars($event['OrgName']) ?> | <strong>Venue:</strong> <?= htmlspecialchars($event['Venue']) ?>
+                                    </span>
+                                </div>
+                            </div>
+                            
+                            <div style="display: flex; align-items: center; gap: 15px;">
+                                <span class="date"><?= date('M j, Y', strtotime($event['Date'])) ?></span>
+                                
+                                <?php if (empty($event['AttendanceStatus'])): ?>
+                                    <form method="POST" style="margin: 0;">
+                                        <input type="hidden" name="action" value="request_attendance">
+                                        <input type="hidden" name="event_id" value="<?= htmlspecialchars($event['EventID']) ?>">
+                                        <input type="hidden" name="membership_id" value="<?= htmlspecialchars($event['MembershipID']) ?>">
+                                        <button type="submit" class="btn-primary" style="margin-top: 0; padding: 0.5rem 1rem; width: auto; font-size: 0.85rem;">Request Attendance</button>
+                                    </form>
+                                <?php elseif ($event['AttendanceStatus'] === 'Pending'): ?>
+                                    <span style="background: #FEF9E7; color: #B7950B; padding: 0.4rem 0.8rem; border-radius: 4px; font-size: 0.85rem; font-weight: bold;">Pending Approval</span>
+                                <?php elseif ($event['AttendanceStatus'] === 'Approved'): ?>
+                                    <span style="background: #d4edda; color: #155724; padding: 0.4rem 0.8rem; border-radius: 4px; font-size: 0.85rem; font-weight: bold;">✓ Attended</span>
+                                <?php endif; ?>
+                            </div>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
+            <?php endif; ?>
         </div>
     </main>
 </div>

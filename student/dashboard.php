@@ -21,14 +21,18 @@ try {
     $stmtEvents->execute([$userId]);
     $totalEventsAttended = $stmtEvents->fetch()['total'];
 
-    // 3. Dynamically Calculate Total Possible Events across joined Orgs
+    // 3. Calculate Total Possible Events across joined Orgs
     $stmtPossible = $pdo->prepare("
         SELECT COUNT(*) as total FROM EVENT e
         JOIN MEMBERSHIP m ON e.OrgID = m.OrgID
-        WHERE m.StudentUserID = ? AND m.Status = 'Approved'
+        WHERE m.StudentUserID = ? AND m.Status = 'Approved' AND e.Date <= CURDATE()
     ");
     $stmtPossible->execute([$userId]);
     $totalPossibleEvents = $stmtPossible->fetch()['total'];
+
+    if ($totalEventsAttended > $totalPossibleEvents) {
+        $totalPossibleEvents = $totalEventsAttended;
+    }
     $missedEvents = max(0, $totalPossibleEvents - $totalEventsAttended);
 
     // 4. Gather Upcoming Scheduled Events List

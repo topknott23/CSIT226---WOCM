@@ -1,29 +1,9 @@
 <?php
 session_start();
 require_once 'includes/db_connect.php';
-
-try {
-    // 1. Fetch all active organizations
-    $stmtOrgs = $pdo->query("SELECT OrgName, Category, DateEstablished FROM ORGANIZATION ORDER BY OrgName ASC");
-    $organizations = $stmtOrgs->fetchAll();
-
-    // 2. Fetch upcoming public events
-    $stmtEvents = $pdo->query("
-        SELECT e.EventTitle, e.Date, e.Venue, o.OrgName 
-        FROM EVENT e
-        JOIN ORGANIZATION o ON e.OrgID = o.OrgID
-        WHERE e.Date >= CURDATE()
-        ORDER BY e.Date ASC 
-        LIMIT 10
-    ");
-    $events = $stmtEvents->fetchAll();
-
-} catch (PDOException $e) {
-    die("Error fetching public data: " . $e->getMessage());
-}
+include 'includes/header.php';
 ?>
 
-<?php include 'includes/header.php'; ?>
 
 <style>
     main{background-image:none;}
