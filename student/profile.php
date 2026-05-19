@@ -27,6 +27,7 @@ try {
 } catch (PDOException $e) {
     die("Error: " . $e->getMessage());
 }
+// combines the core account login data with student specific profile metadata
 ?>
 <?php include '../includes/header.php'; ?>
 <div class="dashboard-layout">

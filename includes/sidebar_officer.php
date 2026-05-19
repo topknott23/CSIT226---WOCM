@@ -12,6 +12,11 @@ try {
         JOIN STUDENT s ON o.UserID = s.UserID
         WHERE o.UserID = ?
     ");
+     // chains together officer roles, 
+    // organization profiles and student data to gather 
+    // and display leadership titles
+
+
     $stmtOffSid->execute([$userId]);
     $officerData = $stmtOffSid->fetch();
     $orgId = $officerData['OrgID'] ?? '';

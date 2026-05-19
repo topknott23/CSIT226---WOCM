@@ -26,6 +26,7 @@ try {
         SELECT s.FullName, s.StudentID, s.Course, s.YearLevel, u.Email
         FROM STUDENT s JOIN USER u ON s.UserID = u.UserID WHERE s.UserID = ?
     ");
+    // combines the core account login data with student specific profile metadata
     $stmtProfile->execute([$userId]);
     $profileData = $stmtProfile->fetch();
 } catch (PDOException $e) {

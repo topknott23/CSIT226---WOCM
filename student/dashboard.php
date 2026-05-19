@@ -18,6 +18,8 @@ try {
         JOIN MEMBERSHIP m ON a.MembershipID = m.MembershipID
         WHERE m.StudentUserID = ? AND a.Status = 'Approved'
     ");
+    //connects attendance record to membership records to count how many 
+    // approved event check ins a specific student has
     $stmtEvents->execute([$userId]);
     $totalEventsAttended = $stmtEvents->fetch()['total'];
 
@@ -27,6 +29,8 @@ try {
         JOIN MEMBERSHIP m ON e.OrgID = m.OrgID
         WHERE m.StudentUserID = ? AND m.Status = 'Approved' AND e.Date <= CURDATE()
     ");
+    //matches events with the clubs a student has approved memberships in 
+    // to calculate the total number of events they could have attended
     $stmtPossible->execute([$userId]);
     $totalPossibleEvents = $stmtPossible->fetch()['total'];
 
@@ -43,6 +47,9 @@ try {
         WHERE m.StudentUserID = ? AND m.Status = 'Approved' AND e.Date >= CURDATE()
         ORDER BY e.Date ASC LIMIT 5
     ");
+    //links events, organization, and memberships
+    //  together to display a timeline of upcoming events
+    //  for the clubs the student belongs to.
     $stmtUpcoming->execute([$userId]);
     $upcomingEvents = $stmtUpcoming->fetchAll();
 
