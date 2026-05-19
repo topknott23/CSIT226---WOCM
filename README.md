@@ -38,7 +38,7 @@ The system is divided into three main role-based portals to ensure secure and re
 
 ---
 
-## 🛠️ Technologies Used
+##  Technologies Used
 
 This project is built as a dynamic web application using a standard LAMP/WAMP stack:
 
