@@ -4,6 +4,7 @@
 
 # CSIT-226: WOCM
 **Web-based Organization & Chapter Management System**
+**(A project for our Information Management Subject)**
 
 > A comprehensive web platform designed to streamline student organization management, event tracking, and attendance monitoring for the Cebu Institute of Technology – University (CIT-U). 
 
